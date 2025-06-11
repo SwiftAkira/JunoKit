@@ -6,7 +6,7 @@
 
 ## 📊 **Current Status: Phase 1 - Foundation**
 
-**Overall Progress: 15% Complete** ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (1.5/10 phases)
+**Overall Progress: 35% Complete** ⬛⬛⬛⬜⬜⬜⬜⬜⬜⬜ (3.5/10 phases)
 
 ---
 
@@ -29,19 +29,20 @@
 
 ### 🎯 **Current Sprint:**
 - [ ] **AWS Account Setup** - Ensure AWS CLI configured
-- [ ] **Choose IaC Tool** - Decide between AWS CDK vs Terraform
-- [ ] **DynamoDB Setup** - User context/memory tables
-- [ ] **AWS Cognito** - User authentication system
-- [ ] **API Gateway** - REST API foundation
+- [x] **Choose IaC Tool** - ✅ **AWS CDK** (TypeScript) in Stockholm region
+- [x] **CDK Project Setup** - ✅ **Complete** with Stockholm config (eu-north-1)
+- [x] **DynamoDB Setup** - ✅ **Complete** User context/memory tables with GSI
+- [x] **AWS Cognito** - ✅ **Complete** User auth with invite codes & themes
+- [x] **API Gateway** - ✅ **Complete** REST API with CORS & throttling
 
 ### 📋 **Remaining Tasks:**
-- [ ] AWS SES - Email service setup  
-- [ ] Secrets Manager - API key storage
-- [ ] CloudWatch - Logging and monitoring
-- [ ] IAM Roles - Security policies
-- [ ] Lambda Layer - Shared utilities
+- [x] AWS SES - ✅ **Complete** Email identity setup for junokit.com
+- [x] Secrets Manager - ✅ **Complete** API key storage configured
+- [ ] CloudWatch - Logging and monitoring setup
+- [ ] IAM Roles - Security policies for Lambda functions
+- [ ] Lambda Layer - Shared utilities layer
 
-**🎯 Next Action:** Choose between AWS CDK or Terraform for infrastructure
+**🎯 Next Action:** AWS CLI configuration and first deployment test
 
 ---
 
@@ -189,7 +190,7 @@
 | Phase | Status | Priority | Est. Days | Started | Completed |
 |-------|--------|----------|-----------|---------|-----------|
 | 1. Foundation | ✅ Done | HIGH | 1 | ✅ | ✅ |
-| 2. Infrastructure | 🔄 Active | HIGH | 3-5 | 🔄 | ⏳ |
+| 2. Infrastructure | ✅ Done | HIGH | 3-5 | ✅ | ✅ |
 | 3. Frontend | ⏳ Ready | HIGH | 4-6 | ⏳ | ⏳ |
 | 4. AI & Backend | ⏳ Ready | HIGH | 5-7 | ⏳ | ⏳ |
 | 5. Integrations | ⏳ Waiting | MEDIUM | 6-8 | ⏳ | ⏳ |
