@@ -49,7 +49,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const session = await fetchAuthSession();
       const accessToken = session.tokens?.accessToken?.toString();
       
-      const response = await fetch('/api/user/profile', {
+      // Use local mock API for testing, will switch to AWS API Gateway later
+      const apiUrl = process.env.NODE_ENV === 'development' 
+        ? '/api/user/profile' 
+        : `${process.env.NEXT_PUBLIC_API_URL}/user/profile`;
+        
+      const response = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
         },

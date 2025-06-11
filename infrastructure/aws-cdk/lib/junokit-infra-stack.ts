@@ -31,25 +31,11 @@ export class JunokitInfraStack extends cdk.Stack {
         name: 'userId',
         type: dynamodb.AttributeType.STRING,
       },
-      sortKey: {
-        name: 'contextType',
-        type: dynamodb.AttributeType.STRING,
-      },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST, // Cost-effective for MVP
       removalPolicy: cdk.RemovalPolicy.RETAIN, // Protect user data
       pointInTimeRecovery: true, // GDPR compliance - data recovery
       encryption: dynamodb.TableEncryption.AWS_MANAGED, // Data encryption
       timeToLiveAttribute: 'ttl', // Auto-cleanup for ephemeral data
-    });
-
-    // Add GSI for efficient querying
-    this.userContextTable.addGlobalSecondaryIndex({
-      indexName: 'context-type-index',
-      partitionKey: {
-        name: 'contextType',
-        type: dynamodb.AttributeType.STRING,
-      },
-      projectionType: dynamodb.ProjectionType.ALL,
     });
 
     // 🔐 Cognito User Pool - Authentication with Invite Codes
@@ -280,6 +266,81 @@ export class JunokitInfraStack extends cdk.Stack {
     //   compatibleRuntimes: [lambda.Runtime.NODEJS_20_X],
     //   removalPolicy: cdk.RemovalPolicy.RETAIN,
     // });
+
+    // 🔧 Lambda Functions - Core API Endpoints
+    
+    // User Profile Lambda Function
+    const userProfileFunction = new lambda.Function(this, 'UserProfileFunction', {
+      functionName: 'junokit-user-profile',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'user-profile.handler',
+      code: lambda.Code.fromAsset('../../backend/functions/auth', {
+        bundling: {
+          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
+          command: [
+            'bash', '-c', [
+              'cp -r /asset-input/* /asset-output/',
+              'cd /asset-output',
+              'npm install aws-sdk @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb aws-jwt-verify @types/aws-lambda',
+            ].join(' && '),
+          ],
+        },
+      }),
+      role: this.lambdaExecutionRole,
+      environment: {
+        USER_CONTEXT_TABLE: this.userContextTable.tableName,
+        USER_POOL_ID: this.userPool.userPoolId,
+        USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
+        AWS_REGION: this.region,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      logGroup: lambdaLogGroup,
+    });
+
+    // API Gateway Integration - User Profile Endpoints
+    const userResource = this.api.root.addResource('user');
+    const profileResource = userResource.addResource('profile');
+    
+    // GET /user/profile - Get user profile
+    profileResource.addMethod('GET', new apigateway.LambdaIntegration(userProfileFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: new apigateway.CognitoUserPoolsAuthorizer(this, 'UserProfileAuthorizer', {
+        cognitoUserPools: [this.userPool],
+      }),
+    });
+
+    // PUT /user/profile - Update user profile  
+    profileResource.addMethod('PUT', new apigateway.LambdaIntegration(userProfileFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: new apigateway.CognitoUserPoolsAuthorizer(this, 'UserProfileUpdateAuthorizer', {
+        cognitoUserPools: [this.userPool],
+      }),
+    });
+
+    // OPTIONS for CORS
+    profileResource.addMethod('OPTIONS', new apigateway.MockIntegration({
+      integrationResponses: [{
+        statusCode: '200',
+        responseParameters: {
+          'method.response.header.Access-Control-Allow-Headers': "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+          'method.response.header.Access-Control-Allow-Origin': "'*'",
+          'method.response.header.Access-Control-Allow-Methods': "'GET,PUT,OPTIONS'",
+        },
+      }],
+      requestTemplates: {
+        'application/json': '{"statusCode": 200}',
+      },
+    }), {
+      methodResponses: [{
+        statusCode: '200',
+        responseParameters: {
+          'method.response.header.Access-Control-Allow-Headers': true,
+          'method.response.header.Access-Control-Allow-Origin': true,
+          'method.response.header.Access-Control-Allow-Methods': true,
+        },
+      }],
+    });
 
     // 📈 CloudWatch Alarms - Error Monitoring
     const lambdaErrorAlarm = new logs.MetricFilter(this, 'JunokitLambdaErrors', {

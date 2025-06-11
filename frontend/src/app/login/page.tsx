@@ -1,7 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { signIn, SignInInput } from 'aws-amplify/auth';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { 
@@ -26,28 +29,93 @@ const RetroGrid = () => {
 
 export default function LoginPage() {
   const { isDarkMode, toggleDarkMode } = useTheme();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && !authLoading) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, authLoading, router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
-    // Mock login - replace with actual Cognito integration
-    setTimeout(() => {
-      if (email === 'demo@example.com' && password === 'demo123') {
-        // Redirect to dashboard
-        window.location.href = '/dashboard';
-      } else {
-        setError('Invalid email or password. Try demo@example.com / demo123');
+    try {
+      const signInInput: SignInInput = {
+        username: email,
+        password: password,
+      };
+
+      const result = await signIn(signInInput);
+      
+      // Handle different sign-in outcomes
+      if (result.isSignedIn) {
+        // Successfully signed in
+        router.push('/dashboard');
+      } else if (result.nextStep) {
+        // Handle additional steps (MFA, password reset, etc.)
+        switch (result.nextStep.signInStep) {
+          case 'CONFIRM_SIGN_UP':
+            setError('Please check your email and confirm your account first.');
+            break;
+          case 'RESET_PASSWORD':
+            setError('Password reset required. Please check your email.');
+            break;
+          case 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED':
+            setError('Please set a new password.');
+            break;
+          default:
+            setError('Additional verification required. Please check your email.');
+        }
       }
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      
+      // Handle specific error types
+      switch (error.name) {
+        case 'NotAuthorizedException':
+          setError('Invalid email or password. Please try again.');
+          break;
+        case 'UserNotConfirmedException':
+          setError('Please check your email and confirm your account first.');
+          break;
+        case 'UserNotFoundException':
+          setError('No account found with this email address.');
+          break;
+        case 'TooManyRequestsException':
+          setError('Too many failed attempts. Please try again later.');
+          break;
+        case 'LimitExceededException':
+          setError('Too many requests. Please try again later.');
+          break;
+        default:
+          setError('Sign in failed. Please try again.');
+      }
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
+
+  // Show loading spinner while checking auth state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 relative">
@@ -112,6 +180,15 @@ export default function LoginPage() {
               </p>
             </div>
 
+            {/* Demo Credentials Info */}
+            <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+              <div className="text-blue-800 dark:text-blue-200">
+                <p className="text-sm font-medium mb-1">Demo Account:</p>
+                <p className="text-xs">Email: demo@junokit.com</p>
+                <p className="text-xs">Password: TempPass123!</p>
+              </div>
+            </div>
+
             {/* Error Message */}
             {error && (
               <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
@@ -135,6 +212,7 @@ export default function LoginPage() {
                   className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors"
                   placeholder="Enter your email"
                   required
+                  disabled={isLoading}
                 />
               </div>
 
@@ -150,11 +228,13 @@ export default function LoginPage() {
                     className="w-full px-3 py-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors"
                     placeholder="Enter your password"
                     required
+                    disabled={isLoading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    disabled={isLoading}
                   >
                     {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                   </button>
@@ -168,6 +248,7 @@ export default function LoginPage() {
                     name="remember-me"
                     type="checkbox"
                     className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                    disabled={isLoading}
                   />
                   <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                     Remember me
@@ -208,19 +289,6 @@ export default function LoginPage() {
                 >
                   Sign up
                 </Link>
-              </p>
-            </div>
-          </div>
-
-          {/* Demo Credentials */}
-          <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
-            <div className="text-center">
-              <p className="text-sm text-blue-800 dark:text-blue-200 font-medium mb-2">
-                Demo Credentials
-              </p>
-              <p className="text-xs text-blue-600 dark:text-blue-300">
-                Email: demo@example.com<br />
-                Password: demo123
               </p>
             </div>
           </div>

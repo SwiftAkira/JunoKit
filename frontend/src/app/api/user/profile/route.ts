@@ -1,50 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Mock user profile API for testing authentication flow
+// This will be replaced with actual AWS Lambda integration
+
 export async function GET(request: NextRequest) {
-  // This is a placeholder API route until our Lambda backend is ready
-  // In production, this will proxy to our AWS API Gateway
-  
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  try {
+    // Check for authorization header
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Missing or invalid authorization header' },
+        { status: 401 }
+      );
+    }
+
+    // Mock user profile data
+    const mockProfile = {
+      userId: 'mock-user-123',
+      email: 'demo@junokit.com',
+      firstName: 'Demo',
+      lastName: 'User',
+      role: 'dev',
+      theme: 'dev',
+      createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    return NextResponse.json(mockProfile, { status: 200 });
+  } catch (error) {
+    console.error('Mock API error:', error);
     return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
+      { error: 'Internal server error' },
+      { status: 500 }
     );
   }
-
-  // Mock user profile data
-  const mockProfile = {
-    email: 'user@example.com',
-    given_name: 'Demo',
-    family_name: 'User',
-    custom_role: 'dev',
-    custom_theme: 'dev',
-    custom_inviteCode: 'DEMO123',
-    createdAt: new Date().toISOString(),
-  };
-
-  return NextResponse.json(mockProfile);
 }
 
 export async function PUT(request: NextRequest) {
-  // Placeholder for updating user profile
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  try {
+    // Check for authorization header
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Missing or invalid authorization header' },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    
+    // Mock updated profile data
+    const updatedProfile = {
+      userId: 'mock-user-123',
+      email: 'demo@junokit.com',
+      firstName: body.firstName || 'Demo',
+      lastName: body.lastName || 'User',
+      role: body.role || 'dev',
+      theme: body.theme || 'dev',
+      createdAt: '2025-01-01T00:00:00.000Z',
+      lastLoginAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    return NextResponse.json(updatedProfile, { status: 200 });
+  } catch (error) {
+    console.error('Mock API error:', error);
     return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
+      { error: 'Internal server error' },
+      { status: 500 }
     );
   }
-
-  const body = await request.json();
-  
-  // In production, this would update the user profile via our API Gateway
-  console.log('Profile update request:', body);
-  
-  return NextResponse.json({
-    success: true,
-    message: 'Profile updated successfully',
-  });
 } 
