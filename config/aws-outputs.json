@@ -1,0 +1,37 @@
+{
+  "region": "eu-north-1",
+  "deployment": {
+    "timestamp": "2024-06-11T22:03:00Z",
+    "stackName": "JunokitInfraStack",
+    "stackArn": "arn:aws:cloudformation:eu-north-1:060795920729:stack/JunokitInfraStack/96776fe0-46ff-11f0-bc71-06c8497fa2e9"
+  },
+  "outputs": {
+    "apiGatewayUrl": "https://nayr2j5df2.execute-api.eu-north-1.amazonaws.com/v1/",
+    "userPoolId": "eu-north-1_QUaZ7e7OU",
+    "userPoolClientId": "66ako4srqdk2aghompd956bloa",
+    "userContextTableName": "junokit-user-context",
+    "apiSecretsArn": "arn:aws:secretsmanager:eu-north-1:060795920729:secret:junokit-api-secrets-CUfe8u",
+    "lambdaExecutionRoleArn": "arn:aws:iam::060795920729:role/junokit-lambda-execution-role",
+    "lambdaLogGroupName": "/aws/lambda/junokit"
+  },
+  "environment": {
+    "NEXT_PUBLIC_AWS_REGION": "eu-north-1",
+    "NEXT_PUBLIC_USER_POOL_ID": "eu-north-1_QUaZ7e7OU",
+    "NEXT_PUBLIC_USER_POOL_CLIENT_ID": "66ako4srqdk2aghompd956bloa",
+    "NEXT_PUBLIC_API_URL": "https://nayr2j5df2.execute-api.eu-north-1.amazonaws.com/v1",
+    "AWS_REGION": "eu-north-1",
+    "USER_CONTEXT_TABLE": "junokit-user-context",
+    "API_SECRETS_ARN": "arn:aws:secretsmanager:eu-north-1:060795920729:secret:junokit-api-secrets-CUfe8u",
+    "LAMBDA_EXECUTION_ROLE_ARN": "arn:aws:iam::060795920729:role/junokit-lambda-execution-role"
+  },
+  "status": "DEPLOYED",
+  "notes": {
+    "deployment": "Infrastructure successfully deployed to Stockholm (eu-north-1)",
+    "cognito": "User pool configured for invite-only registration",
+    "dynamodb": "User context table with pay-per-request billing",
+    "apiGateway": "REST API with CORS enabled, logging disabled temporarily",
+    "secrets": "API secrets ready for OpenRouter, Slack, GitHub tokens",
+    "iam": "Lambda execution role with least-privilege permissions",
+    "monitoring": "CloudWatch log groups created, metrics enabled"
+  }
+} 
