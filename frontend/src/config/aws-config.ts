@@ -38,8 +38,8 @@ export const awsConfig = {
   
   // Theme System Configuration
   themes: {
-    default: 'dev',
-    available: ['dev', 'ops', 'qa', 'sales', 'media'] as const,
+    default: 'general',
+    available: ['general'] as const,
   },
 };
 
@@ -55,7 +55,7 @@ export const amplifyConfig = {
         username: false,
         phone: false,
       },
-      signUpVerificationMethod: 'code',
+      signUpVerificationMethod: 'code' as const,
       userAttributes: {
         email: {
           required: true,
@@ -101,50 +101,16 @@ export interface UserTheme {
   description: string;
   primaryColor: string;
   secondaryColor: string;
-  mascotAccessory: string;
 }
 
 // Theme Configurations
 export const themeConfigurations: Record<ThemeType, UserTheme> = {
-  dev: {
-    id: 'dev',
-    name: 'Developer',
-    description: 'Perfect for software developers and engineers',
-    primaryColor: 'blue',
-    secondaryColor: 'cyan',
-    mascotAccessory: 'glasses',
-  },
-  ops: {
-    id: 'ops',
-    name: 'Operations',
-    description: 'Designed for DevOps and system administrators',
-    primaryColor: 'green',
-    secondaryColor: 'emerald',
-    mascotAccessory: 'headset',
-  },
-  qa: {
-    id: 'qa',
-    name: 'Quality Assurance',
-    description: 'Tailored for QA engineers and testers',
+  general: {
+    id: 'general',
+    name: 'AI Assistant',
+    description: 'Your intelligent AI companion for any task or question',
     primaryColor: 'purple',
     secondaryColor: 'violet',
-    mascotAccessory: 'clipboard',
-  },
-  sales: {
-    id: 'sales',
-    name: 'Sales',
-    description: 'Optimized for sales teams and customer relations',
-    primaryColor: 'orange',
-    secondaryColor: 'amber',
-    mascotAccessory: 'tie',
-  },
-  media: {
-    id: 'media',
-    name: 'Media',
-    description: 'Crafted for content creators and marketers',
-    primaryColor: 'pink',
-    secondaryColor: 'rose',
-    mascotAccessory: 'camera',
   },
 };
 

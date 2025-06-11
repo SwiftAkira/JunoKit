@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- AWS text in outline style -->
+  <g fill="none" stroke="#232F3E" stroke-width="8">
+    <!-- A -->
+    <path d="M50 350 L90 250 L130 350 M70 320 L110 320"/>
+    <!-- W -->
+    <path d="M150 250 L170 350 L190 300 L210 350 L230 250"/>
+    <!-- S -->
+    <path d="M250 280 Q270 260 290 280 Q310 300 290 320 Q270 340 290 360 Q310 380 290 400 Q270 420 250 400"/>
+  </g>
+  
+  <!-- Amazon smile in orange -->
+  <path d="M80 380 Q256 420 432 380" fill="none" stroke="#FF9900" stroke-width="12" stroke-linecap="round"/>
+  <path d="M420 370 L432 380 L420 390" fill="none" stroke="#FF9900" stroke-width="8" stroke-linecap="round"/>
+</svg> 

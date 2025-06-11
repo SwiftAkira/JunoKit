@@ -7,9 +7,9 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Junokit - AI Work Assistant",
-  description: "Your intelligent work companion powered by Jupiter. Streamline your workflow with AI assistance tailored to your role.",
-  keywords: ["AI", "assistant", "productivity", "work", "automation", "chat"],
+  title: "Junokit - AI Assistant",
+  description: "Your intelligent AI companion for any task or question. Get instant help with coding, analysis, creative projects, and problem-solving.",
+  keywords: ["AI", "assistant", "chat", "help", "questions", "coding", "analysis"],
   authors: [{ name: "Junokit Team" }],
   creator: "Junokit",
   publisher: "Junokit",
@@ -18,20 +18,38 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: "https://junokit.com",
-    title: "Junokit - AI Work Assistant",
-    description: "Your intelligent work companion powered by Jupiter. Streamline your workflow with AI assistance tailored to your role.",
+    title: "Junokit - AI Assistant",
+    description: "Your intelligent AI companion for any task or question. Get instant help with coding, analysis, creative projects, and problem-solving.",
     siteName: "Junokit",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Junokit - AI Work Assistant",
-    description: "Your intelligent work companion powered by Jupiter.",
+    title: "Junokit - AI Assistant",
+    description: "Your intelligent AI companion for any task or question.",
     creator: "@junokit",
   },
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32", type: "image/x-icon" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
     shortcut: "/favicon-16x16.png",
     apple: "/apple-touch-icon.png",
+    other: [
+      {
+        rel: "android-chrome",
+        url: "/android-chrome-192x192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        rel: "android-chrome",
+        url: "/android-chrome-512x512.png", 
+        sizes: "512x512",
+        type: "image/png",
+      },
+    ],
   },
   manifest: "/site.webmanifest",
 };

@@ -32,7 +32,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const [isThemeLoading, setIsThemeLoading] = useState(false);
 
   // Get current theme configuration
-  const themeConfig = themeConfigurations[currentTheme];
+  const themeConfig = themeConfigurations[currentTheme] || themeConfigurations.general;
   const availableThemes = Object.values(themeConfigurations);
 
   // Initialize theme from user profile or localStorage
@@ -61,7 +61,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   // Apply theme to document
   useEffect(() => {
     const root = document.documentElement;
-    const theme = themeConfigurations[currentTheme];
+    const theme = themeConfigurations[currentTheme] || themeConfigurations.general;
     
     // Set CSS custom properties for theme colors
     root.style.setProperty('--theme-primary', getPrimaryColorValue(theme.primaryColor));
@@ -161,7 +161,7 @@ function getSecondaryColorValue(color: string): string {
 
 // Theme class generator for Tailwind CSS
 export function getThemeClasses(theme: ThemeType, isDark: boolean = false) {
-  const config = themeConfigurations[theme];
+  const config = themeConfigurations[theme] || themeConfigurations.general;
   const baseClasses = {
     primary: `bg-${config.primaryColor}-500 text-white`,
     secondary: `bg-${config.secondaryColor}-500 text-white`,

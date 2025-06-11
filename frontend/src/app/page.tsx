@@ -8,15 +8,15 @@ import '@aws-amplify/ui-react/styles.css';
 import { useState } from 'react';
 import Image from 'next/image';
 import { JunokitHero } from '@/components/blocks/junokit-hero';
+import { IntegrationsNetwork } from '@/components/blocks/integrations-diagram';
 import { 
   MoonIcon,
   SunIcon,
-  ChartBarIcon,
 } from '@heroicons/react/24/outline';
 
 export default function HomePage() {
   const { isAuthenticated, user, userProfile, signOut } = useAuth();
-  const { currentTheme, themeConfig, availableThemes, setTheme, isDarkMode, toggleDarkMode } = useTheme();
+  const { isDarkMode, toggleDarkMode } = useTheme();
   const [showLogin, setShowLogin] = useState(false);
 
   if (showLogin && !isAuthenticated) {
@@ -104,23 +104,6 @@ export default function HomePage() {
             </div>
             
             <div className="flex items-center space-x-4">
-              {/* Enhanced Theme Selector */}
-              <div className="relative">
-                <select
-                  value={currentTheme}
-                  onChange={(e) => setTheme(e.target.value as any)}
-                  className={`appearance-none bg-white dark:bg-gray-800 border-2 border-purple-200 dark:border-purple-700 rounded-lg px-4 py-2 text-sm text-gray-900 dark:text-white pr-8 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all`}
-                >
-                  {availableThemes.map((theme) => (
-                    <option key={theme.id} value={theme.id}>
-                      {theme.name} {theme.mascotAccessory}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                  <ChartBarIcon className="h-4 w-4 text-gray-400" />
-                </div>
-              </div>
               
               {/* Enhanced Dark Mode Toggle */}
               <button
@@ -162,53 +145,10 @@ export default function HomePage() {
       {/* Modern Hero Section */}
       <main className="pt-16">
         <JunokitHero />
+        <IntegrationsNetwork />
       </main>
 
-      {/* User Profile Section (if authenticated) */}
-      {isAuthenticated && (
-        <div className="py-12 bg-white dark:bg-gray-900">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl shadow-xl overflow-hidden">
-              <div className="px-8 py-12 text-white">
-                <div className="flex items-center justify-between mb-8">
-                  <div>
-                    <h3 className="text-2xl font-bold mb-2">
-                      Welcome back, {userProfile?.firstName}! 👋
-                    </h3>
-                    <p className="text-purple-100">
-                      Your {themeConfig.name} workspace is ready
-                    </p>
-                  </div>
-                  <div className="text-6xl opacity-20">
-                    {themeConfig.mascotAccessory === 'glasses' ? '👓' : 
-                     themeConfig.mascotAccessory === 'headset' ? '🎧' :
-                     themeConfig.mascotAccessory === 'clipboard' ? '📋' :
-                     themeConfig.mascotAccessory === 'tie' ? '👔' : '📷'}
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                    <p className="text-sm text-purple-100 mb-1">Role</p>
-                    <p className="font-semibold">{themeConfig.name}</p>
-                  </div>
-                  <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                    <p className="text-sm text-purple-100 mb-1">Theme</p>
-                    <p className="font-semibold">{themeConfig.description}</p>
-                  </div>
-                  <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                    <p className="text-sm text-purple-100 mb-1">Status</p>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                      <span className="font-semibold">Active</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12">
@@ -224,7 +164,7 @@ export default function HomePage() {
               <span className="text-xl font-bold">Junokit</span>
             </div>
             <p className="text-gray-400">
-              © 2024 Junokit. Powered by Jupiter AI.
+              © 2025 Junokit. Your Intelligent AI Assistant.
             </p>
           </div>
         </div>

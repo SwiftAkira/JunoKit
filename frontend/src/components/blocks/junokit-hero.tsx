@@ -5,16 +5,13 @@ function JunokitHero() {
     <HeroSection
       title="🪐 Welcome to Junokit"
       subtitle={{
-        regular: "Transform your workflow with ",
-        gradient: "Jupiter-powered AI assistance",
+        regular: "Your intelligent ",
+        gradient: "AI assistant",
       }}
-      description="Streamline your development, operations, QA, sales, and media workflows with our intelligent AI assistant. Personalized for your role, powered by enterprise-grade infrastructure."
-      ctaText="Get Started Free"
-      ctaHref="/signup"
-      bottomImage={{
-        light: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&h=600&fit=crop&crop=center",
-        dark: "https://images.unsplash.com/photo-1518432031352-d6fc5c10da5a?w=1200&h=600&fit=crop&crop=center",
-      }}
+      description="Get instant help with any task or question. From coding and analysis to creative projects and problem-solving - your AI companion is ready to assist with enterprise-grade reliability."
+      ctaText="Start Chatting"
+      ctaHref="/chat"
+      bottomImage={undefined}
       gridOptions={{
         angle: 65,
         opacity: 0.3,
