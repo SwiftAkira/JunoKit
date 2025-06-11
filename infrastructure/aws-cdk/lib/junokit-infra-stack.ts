@@ -26,7 +26,7 @@ export class JunokitInfraStack extends cdk.Stack {
 
     // 📊 DynamoDB Table - User Context & Memory
     this.userContextTable = new dynamodb.Table(this, 'UserContextTable', {
-      tableName: 'junokit-user-context',
+      tableName: 'junokit-user-context-v2',
       partitionKey: {
         name: 'userId',
         type: dynamodb.AttributeType.STRING,
@@ -284,6 +284,36 @@ export class JunokitInfraStack extends cdk.Stack {
               'npm install aws-sdk @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb aws-jwt-verify @types/aws-lambda',
             ].join(' && '),
           ],
+          local: {
+            tryBundle(outputDir: string) {
+              try {
+                // Copy source files
+                const fs = require('fs');
+                const path = require('path');
+                const { execSync } = require('child_process');
+                
+                // Get the correct path from CDK lib directory to backend functions
+                const sourceDir = '../../../backend/functions/auth';
+                const fullSourcePath = path.resolve(__dirname, sourceDir);
+                
+                console.log(`Copying from: ${fullSourcePath} to: ${outputDir}`);
+                
+                // Copy all files from source to output
+                execSync(`cp -r ${fullSourcePath}/* ${outputDir}/`, { stdio: 'inherit' });
+                
+                // Install dependencies in output directory
+                execSync('npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb aws-jwt-verify @types/aws-lambda', {
+                  cwd: outputDir,
+                  stdio: 'inherit'
+                });
+                
+                return true; // Bundling succeeded
+              } catch (error) {
+                console.error('Local bundling failed:', error);
+                return false; // Fall back to Docker
+              }
+            }
+          }
         },
       }),
       role: this.lambdaExecutionRole,
@@ -291,7 +321,7 @@ export class JunokitInfraStack extends cdk.Stack {
         USER_CONTEXT_TABLE: this.userContextTable.tableName,
         USER_POOL_ID: this.userPool.userPoolId,
         USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
-        AWS_REGION: this.region,
+        REGION: this.region,
       },
       timeout: cdk.Duration.seconds(30),
       memorySize: 256,
@@ -318,29 +348,7 @@ export class JunokitInfraStack extends cdk.Stack {
       }),
     });
 
-    // OPTIONS for CORS
-    profileResource.addMethod('OPTIONS', new apigateway.MockIntegration({
-      integrationResponses: [{
-        statusCode: '200',
-        responseParameters: {
-          'method.response.header.Access-Control-Allow-Headers': "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
-          'method.response.header.Access-Control-Allow-Origin': "'*'",
-          'method.response.header.Access-Control-Allow-Methods': "'GET,PUT,OPTIONS'",
-        },
-      }],
-      requestTemplates: {
-        'application/json': '{"statusCode": 200}',
-      },
-    }), {
-      methodResponses: [{
-        statusCode: '200',
-        responseParameters: {
-          'method.response.header.Access-Control-Allow-Headers': true,
-          'method.response.header.Access-Control-Allow-Origin': true,
-          'method.response.header.Access-Control-Allow-Methods': true,
-        },
-      }],
-    });
+    // CORS is handled automatically by defaultCorsPreflightOptions
 
     // 📈 CloudWatch Alarms - Error Monitoring
     const lambdaErrorAlarm = new logs.MetricFilter(this, 'JunokitLambdaErrors', {

@@ -4,7 +4,7 @@ import { DynamoDBDocumentClient, GetCommand, PutCommand } from '@aws-sdk/lib-dyn
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
 
 // Initialize DynamoDB client
-const dynamoClient = new DynamoDBClient({ region: process.env.AWS_REGION });
+const dynamoClient = new DynamoDBClient({ region: process.env.REGION || process.env.AWS_REGION });
 const docClient = DynamoDBDocumentClient.from(dynamoClient);
 
 // Initialize Cognito JWT verifier
