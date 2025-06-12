@@ -204,10 +204,12 @@ export class JunokitInfraStack extends cdk.Stack {
     const apiSecrets = new secretsmanager.Secret(this, 'JunokitApiSecrets', {
       secretName: 'junokit-api-secrets',
       description: 'Junokit API keys and sensitive configuration',
-      generateSecretString: {
+              generateSecretString: {
         secretStringTemplate: JSON.stringify({
           openRouterApiKey: '',
           slackBotToken: '',
+          slackClientId: '',
+          slackClientSecret: '',
           githubToken: '',
           googleClientId: '',
           googleClientSecret: '',
@@ -415,6 +417,179 @@ export class JunokitInfraStack extends cdk.Stack {
     });
 
     // CORS is handled automatically by defaultCorsPreflightOptions
+
+    // =============================================================================
+    // SLACK INTEGRATION FUNCTIONS
+    // =============================================================================
+
+    // Slack OAuth Lambda Function
+    const slackOAuthFunction = new lambda.Function(this, 'SlackOAuthFunction', {
+      functionName: 'junokit-slack-oauth',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'slack-oauth.handler',
+      code: lambda.Code.fromAsset('../../backend/functions/integrations', {
+        bundling: {
+          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
+          command: [
+            'bash', '-c', [
+              'cp -r /asset-input/* /asset-output/',
+              'cd /asset-output',
+              'npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb @aws-sdk/client-secrets-manager aws-jwt-verify @types/aws-lambda',
+            ].join(' && '),
+          ],
+          local: {
+            tryBundle(outputDir: string) {
+              try {
+                const fs = require('fs');
+                const path = require('path');
+                const { execSync } = require('child_process');
+                
+                const sourceDir = '../../../backend/functions/integrations';
+                const fullSourcePath = path.resolve(__dirname, sourceDir);
+                
+                console.log(`Copying from: ${fullSourcePath} to: ${outputDir}`);
+                
+                execSync(`cp -r ${fullSourcePath}/* ${outputDir}/`, { stdio: 'inherit' });
+                
+                execSync('npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb @aws-sdk/client-secrets-manager aws-jwt-verify @types/aws-lambda', {
+                  cwd: outputDir,
+                  stdio: 'inherit'
+                });
+                
+                return true;
+              } catch (error) {
+                console.error('Local bundling failed:', error);
+                return false;
+              }
+            }
+          }
+        },
+      }),
+      role: this.lambdaExecutionRole,
+      environment: {
+        USER_CONTEXT_TABLE: this.userContextTable.tableName,
+        USER_POOL_ID: this.userPool.userPoolId,
+        USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
+        REGION: this.region,
+        API_SECRETS_ARN: apiSecrets.secretArn,
+        FRONTEND_URL: process.env.FRONTEND_URL || 'https://app.junokit.com',
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      logGroup: lambdaLogGroup,
+    });
+
+    // Slack Messaging Lambda Function
+    const slackMessagingFunction = new lambda.Function(this, 'SlackMessagingFunction', {
+      functionName: 'junokit-slack-messaging',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'slack-messaging.handler',
+      code: lambda.Code.fromAsset('../../backend/functions/integrations', {
+        bundling: {
+          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
+          command: [
+            'bash', '-c', [
+              'cp -r /asset-input/* /asset-output/',
+              'cd /asset-output',
+              'npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb aws-jwt-verify @types/aws-lambda',
+            ].join(' && '),
+          ],
+          local: {
+            tryBundle(outputDir: string) {
+              try {
+                const fs = require('fs');
+                const path = require('path');
+                const { execSync } = require('child_process');
+                
+                const sourceDir = '../../../backend/functions/integrations';
+                const fullSourcePath = path.resolve(__dirname, sourceDir);
+                
+                console.log(`Copying from: ${fullSourcePath} to: ${outputDir}`);
+                
+                execSync(`cp -r ${fullSourcePath}/* ${outputDir}/`, { stdio: 'inherit' });
+                
+                execSync('npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb aws-jwt-verify @types/aws-lambda', {
+                  cwd: outputDir,
+                  stdio: 'inherit'
+                });
+                
+                return true;
+              } catch (error) {
+                console.error('Local bundling failed:', error);
+                return false;
+              }
+            }
+          }
+        },
+      }),
+      role: this.lambdaExecutionRole,
+      environment: {
+        USER_CONTEXT_TABLE: this.userContextTable.tableName,
+        USER_POOL_ID: this.userPool.userPoolId,
+        USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
+        REGION: this.region,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      logGroup: lambdaLogGroup,
+    });
+
+    // API Gateway Integration - Slack Endpoints
+    const integrationsResource = this.api.root.addResource('integrations');
+    const slackResource = integrationsResource.addResource('slack');
+    
+    // Slack OAuth endpoints
+    const slackAuthResource = slackResource.addResource('auth');
+    slackAuthResource.addMethod('GET', new apigateway.LambdaIntegration(slackOAuthFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: new apigateway.CognitoUserPoolsAuthorizer(this, 'SlackAuthAuthorizer', {
+        cognitoUserPools: [this.userPool],
+      }),
+    });
+
+    const slackCallbackResource = slackResource.addResource('callback');
+    slackCallbackResource.addMethod('GET', new apigateway.LambdaIntegration(slackOAuthFunction));
+
+    const slackStatusResource = slackResource.addResource('status');
+    slackStatusResource.addMethod('GET', new apigateway.LambdaIntegration(slackOAuthFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: new apigateway.CognitoUserPoolsAuthorizer(this, 'SlackStatusAuthorizer', {
+        cognitoUserPools: [this.userPool],
+      }),
+    });
+
+    const slackDisconnectResource = slackResource.addResource('disconnect');
+    slackDisconnectResource.addMethod('DELETE', new apigateway.LambdaIntegration(slackOAuthFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: new apigateway.CognitoUserPoolsAuthorizer(this, 'SlackDisconnectAuthorizer', {
+        cognitoUserPools: [this.userPool],
+      }),
+    });
+
+    // Slack messaging endpoints
+    const slackSendResource = slackResource.addResource('send');
+    slackSendResource.addMethod('POST', new apigateway.LambdaIntegration(slackMessagingFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: new apigateway.CognitoUserPoolsAuthorizer(this, 'SlackSendAuthorizer', {
+        cognitoUserPools: [this.userPool],
+      }),
+    });
+
+    const slackChannelsResource = slackResource.addResource('channels');
+    slackChannelsResource.addMethod('GET', new apigateway.LambdaIntegration(slackMessagingFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: new apigateway.CognitoUserPoolsAuthorizer(this, 'SlackChannelsAuthorizer', {
+        cognitoUserPools: [this.userPool],
+      }),
+    });
+
+    const slackUsersResource = slackResource.addResource('users');
+    slackUsersResource.addMethod('GET', new apigateway.LambdaIntegration(slackMessagingFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: new apigateway.CognitoUserPoolsAuthorizer(this, 'SlackUsersAuthorizer', {
+        cognitoUserPools: [this.userPool],
+      }),
+    });
 
     // AI Chat Lambda Function
     const aiChatFunction = new lambda.Function(this, 'AiChatFunction', {

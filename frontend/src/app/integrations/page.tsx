@@ -311,9 +311,12 @@ const IntegrationCard = ({ integration }: { integration: Integration }) => {
       {/* Action Button */}
       <div className="mt-auto">
         {integration.status === 'available' && (
-          <button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">
+          <Link 
+            href={integration.id === 'slack' ? '/integrations/slack' : integration.connectUrl || '#'}
+            className="block w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors text-center"
+          >
             Connect
-          </button>
+          </Link>
         )}
         {integration.status === 'connected' && (
           <button className="w-full bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors flex items-center justify-center">

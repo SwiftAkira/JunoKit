@@ -84,20 +84,20 @@ export function ChatSidebar({ onClose, onConversationSelect, onNewConversation, 
             
             if (!conversationMap.has(convId)) {
               // Create new conversation entry
-              conversationMap.set(convId, {
-                id: convId,
+            conversationMap.set(convId, {
+              id: convId,
                 title: '', // Will be set from first user message
-                lastMessage: '',
+              lastMessage: '',
                 timestamp: messageTime,
-                messageCount: 0,
+              messageCount: 0,
                 firstUserMessage: '',
                 lastMessageTime: messageTime,
               });
             }
             
-            const conv = conversationMap.get(convId);
-            conv.messageCount += 1;
-            
+              const conv = conversationMap.get(convId);
+              conv.messageCount += 1;
+              
             // Update latest timestamp
             if (messageTime > conv.timestamp) {
               conv.timestamp = messageTime;
@@ -110,7 +110,7 @@ export function ChatSidebar({ onClose, onConversationSelect, onNewConversation, 
             
             // Update last message - use the most recent message
             if (messageTime >= conv.lastMessageTime) {
-              conv.lastMessage = item.content.substring(0, 100) + (item.content.length > 100 ? '...' : '');
+                conv.lastMessage = item.content.substring(0, 100) + (item.content.length > 100 ? '...' : '');
               conv.lastMessageTime = messageTime;
             }
           }
