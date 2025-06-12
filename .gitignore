@@ -33,6 +33,10 @@ api-keys.json
 config/secrets/
 config/production/
 
+# Files with hardcoded tokens and API keys
+scripts/load-test.js
+frontend/get-token.js
+
 # ===== AWS & INFRASTRUCTURE =====
 # CDK
 cdk.out/
