@@ -578,16 +578,16 @@ export function ChatInterface({ activeConversationId, onConversationCreated }: C
           >
             <div className={`flex max-w-[80%] ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start space-x-2`}>
               {/* Avatar */}
-              <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-visible mt-1 relative">
+              <div className="flex-shrink-0 w-[54px] h-[54px] rounded-full overflow-visible mt-1 relative">
                 {message.sender === 'ai' ? (
                   <div className="relative">
-                    <div className="w-6 h-6 bg-white rounded-full absolute top-1 left-1 z-0"></div>
+                    <div className="w-6 h-6 bg-white rounded-full absolute top-[15px] left-[15px] z-0"></div>
                     <Image
                       src="/JunoKitColorNoBGNoTEXT.png"
                       alt="AI"
-                      width={32}
-                      height={32}
-                      className="w-8 h-8 object-contain relative z-10"
+                      width={54}
+                      height={54}
+                      className="w-[54px] h-[54px] object-contain relative z-10"
                     />
                   </div>
                 ) : (
@@ -725,15 +725,15 @@ export function ChatInterface({ activeConversationId, onConversationCreated }: C
         {isTyping && (
           <div className="flex justify-start group">
             <div className="flex items-start space-x-2 max-w-[80%]">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-visible mt-1 relative">
+              <div className="flex-shrink-0 w-[54px] h-[54px] rounded-full overflow-visible mt-1 relative">
                 <div className="relative">
-                  <div className="w-6 h-6 bg-white rounded-full absolute top-1 left-1 z-0"></div>
+                  <div className="w-6 h-6 bg-white rounded-full absolute top-[15px] left-[15px] z-0"></div>
                   <Image
                     src="/JunoKitColorNoBGNoTEXT.png"
                     alt="AI"
-                    width={32}
-                    height={32}
-                    className="w-8 h-8 object-contain relative z-10"
+                    width={54}
+                    height={54}
+                    className="w-[54px] h-[54px] object-contain relative z-10"
                   />
                 </div>
               </div>
