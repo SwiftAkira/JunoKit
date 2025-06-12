@@ -23,6 +23,11 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+}
+
+html {
+  overflow-x: hidden; /* Prevent horizontal scroll */
 }
 
 /* Custom Animations for Landing Page */
@@ -69,6 +74,46 @@ body {
 /* Enhanced scroll behavior */
 html {
   scroll-behavior: smooth;
+}
+
+/* Default scrollbar styling for all elements */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Dark mode default scrollbars */
+@media (prefers-color-scheme: dark) {
+  * {
+    scrollbar-color: #4b5563 transparent;
+  }
+  
+  *::-webkit-scrollbar-thumb {
+    background: #4b5563;
+  }
+  
+  *::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+  }
 }
 
 /* Custom backdrop blur for glassmorphism effects */

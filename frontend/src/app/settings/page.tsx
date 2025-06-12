@@ -12,7 +12,9 @@ import {
   BellIcon,
   ShieldCheckIcon,
   TrashIcon,
-  CheckIcon
+  CheckIcon,
+  SparklesIcon,
+  ArrowTopRightOnSquareIcon
 } from '@heroicons/react/24/outline';
 
 const RetroGrid = () => {
@@ -243,6 +245,62 @@ export default function SettingsPage() {
                 >
                   Start Tour
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Integrations Section */}
+        <div className="mb-8">
+          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50">
+            <div className="flex items-center space-x-2 mb-6">
+              <SparklesIcon className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Integrations</h2>
+            </div>
+            
+            <div className="space-y-4">
+              <Link 
+                href="/integrations"
+                className="group w-full flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg border border-purple-200 dark:border-purple-800 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-900/30 dark:hover:to-pink-900/30 transition-all duration-300 hover:shadow-lg"
+              >
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <SparklesIcon className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                      Manage Integrations
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Connect your favorite tools and services
+                    </p>
+                  </div>
+                </div>
+                <ArrowTopRightOnSquareIcon className="w-5 h-5 text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors" />
+              </Link>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                      <CheckIcon className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">Connected</span>
+                  </div>
+                  <p className="text-2xl font-bold text-green-600">2</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Active integrations</p>
+                </div>
+                
+                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                      <SparklesIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">Available</span>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-600">12</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Ready to connect</p>
+                </div>
               </div>
             </div>
           </div>

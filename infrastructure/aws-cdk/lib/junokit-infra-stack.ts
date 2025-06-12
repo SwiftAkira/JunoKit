@@ -2,6 +2,8 @@ import * as cdk from 'aws-cdk-lib';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
+import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as ses from 'aws-cdk-lib/aws-ses';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
@@ -14,6 +16,9 @@ export class JunokitInfraStack extends cdk.Stack {
   public readonly userPool: cognito.UserPool;
   public readonly userPoolClient: cognito.UserPoolClient;
   public readonly api: apigateway.RestApi;
+  public readonly webSocketApi: apigatewayv2.WebSocketApi;
+  public readonly webSocketStage: apigatewayv2.WebSocketStage;
+  public readonly connectionsTable: dynamodb.Table;
   public readonly lambdaExecutionRole: iam.Role;
   // public readonly sharedLambdaLayer: lambda.LayerVersion; // TODO: Enable after layer is built
 
@@ -65,6 +70,31 @@ export class JunokitInfraStack extends cdk.Stack {
       },
       sortKey: {
         name: 'GSI1SK',
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
+    // 🔄 DynamoDB Table - WebSocket Connections
+    this.connectionsTable = new dynamodb.Table(this, 'WebSocketConnectionsTable', {
+      tableName: 'junokit-websocket-connections',
+      partitionKey: {
+        name: 'connectionId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // Connections are ephemeral
+      timeToLiveAttribute: 'ttl', // Auto-cleanup stale connections
+    });
+
+    // Add GSI for user connections lookup
+    this.connectionsTable.addGlobalSecondaryIndex({
+      indexName: 'UserConnectionsIndex',
+      partitionKey: {
+        name: 'userId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'connectionId',
         type: dynamodb.AttributeType.STRING,
       },
     });
@@ -227,6 +257,8 @@ export class JunokitInfraStack extends cdk.Stack {
                 `${this.userContextTable.tableArn}/index/*`,
                 chatTable.tableArn,
                 `${chatTable.tableArn}/index/*`,
+                this.connectionsTable.tableArn,
+                `${this.connectionsTable.tableArn}/index/*`,
               ],
             }),
             // Secrets Manager permissions
@@ -274,6 +306,16 @@ export class JunokitInfraStack extends cdk.Stack {
               resources: [
                 lambdaLogGroup.logGroupArn,
                 `${lambdaLogGroup.logGroupArn}:*`,
+              ],
+            }),
+            // WebSocket API Gateway permissions
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'execute-api:ManageConnections',
+              ],
+              resources: [
+                `arn:aws:execute-api:${this.region}:${this.account}:*`,
               ],
             }),
           ],
@@ -478,6 +520,147 @@ export class JunokitInfraStack extends cdk.Stack {
     // PUT /chat/{conversationId} - Update conversation title (Lambda-based auth)
     conversationResource.addMethod('PUT', new apigateway.LambdaIntegration(aiChatFunction));
 
+    // =============================================================================
+    // WEBSOCKET API - Real-time Features
+    // =============================================================================
+
+    // WebSocket Connect Lambda Function
+    const webSocketConnectFunction = new lambda.Function(this, 'WebSocketConnectFunction', {
+      functionName: 'junokit-websocket-connect',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'connect.handler',
+      code: lambda.Code.fromAsset('../../backend/functions/websocket', {
+        bundling: {
+          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
+          command: [
+            'bash', '-c', [
+              'cp -r /asset-input/* /asset-output/',
+              'cd /asset-output',
+              'npm install --production @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb aws-jwt-verify',
+            ].join(' && '),
+          ],
+          local: {
+            tryBundle(outputDir: string) {
+              try {
+                const fs = require('fs');
+                const path = require('path');
+                const { execSync } = require('child_process');
+                
+                const sourceDir = '../../../backend/functions/websocket';
+                const fullSourcePath = path.resolve(__dirname, sourceDir);
+                
+                console.log(`Copying from: ${fullSourcePath} to: ${outputDir}`);
+                
+                execSync(`cp -r ${fullSourcePath}/* ${outputDir}/`, { stdio: 'inherit' });
+                
+                execSync('npm install --production @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb aws-jwt-verify', {
+                  cwd: outputDir,
+                  stdio: 'inherit'
+                });
+                
+                return true;
+              } catch (error) {
+                console.error('Local bundling failed:', error);
+                return false;
+              }
+            }
+          }
+        },
+      }),
+      role: this.lambdaExecutionRole,
+      environment: {
+        CONNECTIONS_TABLE: this.connectionsTable.tableName,
+        USER_POOL_ID: this.userPool.userPoolId,
+        REGION: this.region,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      logGroup: lambdaLogGroup,
+    });
+
+    // WebSocket Disconnect Lambda Function
+    const webSocketDisconnectFunction = new lambda.Function(this, 'WebSocketDisconnectFunction', {
+      functionName: 'junokit-websocket-disconnect',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'disconnect.handler',
+      code: lambda.Code.fromAsset('../../backend/functions/websocket'),
+      role: this.lambdaExecutionRole,
+      environment: {
+        CONNECTIONS_TABLE: this.connectionsTable.tableName,
+        REGION: this.region,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      logGroup: lambdaLogGroup,
+    });
+
+    // WebSocket Message Handler Lambda Function
+    const webSocketMessageFunction = new lambda.Function(this, 'WebSocketMessageFunction', {
+      functionName: 'junokit-websocket-message',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'message.handler',
+      code: lambda.Code.fromAsset('../../backend/functions/websocket'),
+      role: this.lambdaExecutionRole,
+      environment: {
+        CONNECTIONS_TABLE: this.connectionsTable.tableName,
+        CHAT_TABLE: chatTable.tableName,
+        API_SECRETS_ARN: apiSecrets.secretArn,
+        USER_POOL_ID: this.userPool.userPoolId,
+        REGION: this.region,
+      },
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 512,
+      logGroup: lambdaLogGroup,
+    });
+
+    // WebSocket API Gateway
+    this.webSocketApi = new apigatewayv2.WebSocketApi(this, 'JunokitWebSocketApi', {
+      apiName: 'junokit-websocket-api',
+      description: 'Junokit Real-time WebSocket API',
+    });
+
+    // WebSocket Routes with Lambda integrations
+    new apigatewayv2.WebSocketRoute(this, 'ConnectRoute', {
+      webSocketApi: this.webSocketApi,
+      routeKey: '$connect',
+      integration: new integrations.WebSocketLambdaIntegration('ConnectIntegration', webSocketConnectFunction),
+    });
+
+    new apigatewayv2.WebSocketRoute(this, 'DisconnectRoute', {
+      webSocketApi: this.webSocketApi,
+      routeKey: '$disconnect',
+      integration: new integrations.WebSocketLambdaIntegration('DisconnectIntegration', webSocketDisconnectFunction),
+    });
+
+    new apigatewayv2.WebSocketRoute(this, 'DefaultRoute', {
+      webSocketApi: this.webSocketApi,
+      routeKey: '$default',
+      integration: new integrations.WebSocketLambdaIntegration('MessageIntegration', webSocketMessageFunction),
+    });
+
+    // WebSocket API Stage
+    this.webSocketStage = new apigatewayv2.WebSocketStage(this, 'JunokitWebSocketStage', {
+      webSocketApi: this.webSocketApi,
+      stageName: 'v1',
+      autoDeploy: true,
+    });
+
+    // Grant WebSocket API permissions to Lambda functions
+    webSocketConnectFunction.addPermission('AllowWebSocketConnect', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.webSocketApi.apiId}/*/*`,
+    });
+
+    webSocketDisconnectFunction.addPermission('AllowWebSocketDisconnect', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.webSocketApi.apiId}/*/*`,
+    });
+
+    webSocketMessageFunction.addPermission('AllowWebSocketMessage', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${this.webSocketApi.apiId}/*/*`,
+    });
+
     // 📈 CloudWatch Alarms - Error Monitoring
     const lambdaErrorAlarm = new logs.MetricFilter(this, 'JunokitLambdaErrors', {
       logGroup: lambdaLogGroup,
@@ -544,6 +727,24 @@ export class JunokitInfraStack extends cdk.Stack {
       value: lambdaLogGroup.logGroupName,
       description: 'CloudWatch log group for Lambda functions',
       exportName: 'JunokitLambdaLogGroupName',
+    });
+
+    new cdk.CfnOutput(this, 'WebSocketApiUrl', {
+      value: `wss://${this.webSocketApi.apiId}.execute-api.${this.region}.amazonaws.com/v1`,
+      description: 'WebSocket API URL',
+      exportName: 'JunokitWebSocketApiUrl',
+    });
+
+    new cdk.CfnOutput(this, 'WebSocketApiId', {
+      value: this.webSocketApi.apiId,
+      description: 'WebSocket API ID',
+      exportName: 'JunokitWebSocketApiId',
+    });
+
+    new cdk.CfnOutput(this, 'ConnectionsTableName', {
+      value: this.connectionsTable.tableName,
+      description: 'DynamoDB WebSocket Connections Table Name',
+      exportName: 'JunokitConnectionsTable',
     });
 
     // =============================================================================

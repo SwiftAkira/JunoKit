@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { useRealtimeChat } from '@/hooks/useRealtimeChat';
+import { RealtimeChatStatus } from './RealtimeChatStatus';
 import { 
   PaperAirplaneIcon,
   PhotoIcon,
@@ -48,6 +50,15 @@ export function ChatInterface({ activeConversationId, onConversationCreated }: C
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Real-time chat functionality
+  const { 
+    chatState, 
+    sendTypingIndicator, 
+    onNewMessage,
+    onTypingUpdate 
+  } = useRealtimeChat();
   
   // User data from auth context
   const mockUser = { firstName: user?.username?.split('@')[0] || 'Demo', username: user?.username || 'demo-user' };
@@ -109,6 +120,59 @@ export function ChatInterface({ activeConversationId, onConversationCreated }: C
       inputRef.current.style.height = `${inputRef.current.scrollHeight}px`;
     }
   }, [inputValue]);
+
+  // Set up real-time message handlers
+  useEffect(() => {
+    // Handle incoming real-time messages
+    onNewMessage((data: any) => {
+      console.log('📨 Real-time message received:', data);
+      
+      if (data.action === 'ai_response' && data.conversationId === currentConversationId) {
+        const newMessage: Message = {
+          id: data.messageId || `rt_${Date.now()}`,
+          content: data.content,
+          sender: 'ai',
+          timestamp: new Date(data.timestamp || Date.now()),
+          status: 'sent',
+          type: 'text'
+        };
+        
+        setMessages(prev => [...prev, newMessage]);
+        setIsGenerating(false);
+        setIsTyping(false);
+      }
+    });
+
+    // Handle typing indicators
+    onTypingUpdate((data: any) => {
+      console.log('⌨️ Typing update:', data);
+      // Handle typing indicators from other users if needed
+    });
+  }, [currentConversationId, onNewMessage, onTypingUpdate]);
+
+  // Handle input changes with typing indicators
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    setInputValue(newValue);
+
+    // Send typing indicator if connected and we have a conversation
+    if (chatState.isConnected && currentConversationId) {
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      // Send typing start
+      if (newValue.length > 0 && !chatState.isTyping) {
+        sendTypingIndicator(currentConversationId, true);
+      }
+
+      // Set timeout to stop typing indicator
+      typingTimeoutRef.current = setTimeout(() => {
+        sendTypingIndicator(currentConversationId, false);
+      }, 1000);
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isGenerating) return;
@@ -210,7 +274,7 @@ export function ChatInterface({ activeConversationId, onConversationCreated }: C
       <RetroGrid />
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 relative z-10">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 relative z-10 custom-scrollbar">
         {/* Welcome Message - Only show when no messages */}
         {messages.length === 0 && (
           <div className="flex justify-center mb-8">
@@ -341,10 +405,10 @@ export function ChatInterface({ activeConversationId, onConversationCreated }: C
               <textarea
                 ref={inputRef}
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
+                onChange={handleInputChange}
                 onKeyDown={handleKeyPress}
                 placeholder="Ask your AI assistant anything..."
-                className="w-full resize-none rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 pr-12 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-all max-h-32 min-h-[48px]"
+                className="w-full resize-none rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 pr-12 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-all max-h-32 min-h-[48px] custom-scrollbar-thin"
                 rows={1}
                 disabled={isGenerating}
               />
@@ -377,9 +441,13 @@ export function ChatInterface({ activeConversationId, onConversationCreated }: C
             )}
           </div>
 
-          {/* Helper text */}
-          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
-            Press Enter to send, Shift+Enter for new line
+          {/* Helper text and status */}
+          <div className="mt-2 flex items-center justify-between">
+            <RealtimeChatStatus className="flex items-center space-x-2" />
+            <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+              Press Enter to send, Shift+Enter for new line
+            </div>
+            <div className="w-32" /> {/* Spacer for balance */}
           </div>
         </div>
       </div>

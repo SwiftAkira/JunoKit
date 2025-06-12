@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ChatInterface } from '@/components/chat/ChatInterface';
 import { ChatSidebar } from '@/components/chat/ChatSidebar';
+import { RealtimeChatStatusCompact } from '@/components/chat/RealtimeChatStatus';
 import Image from 'next/image';
 import { 
   MoonIcon,
@@ -96,6 +97,9 @@ export default function ChatPage() {
             </div>
 
             <div className="flex items-center space-x-3">
+              {/* Real-time status */}
+              <RealtimeChatStatusCompact />
+              
               {/* Dark mode toggle */}
               <button
                 onClick={toggleDarkMode}

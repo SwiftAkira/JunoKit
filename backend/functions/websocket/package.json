@@ -1,0 +1,19 @@
+{
+  "name": "junokit-websocket-functions",
+  "version": "1.0.0",
+  "description": "WebSocket Lambda functions for Junokit real-time features",
+  "main": "connect.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.654.0",
+    "@aws-sdk/lib-dynamodb": "^3.654.0",
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.654.0",
+    "@aws-sdk/client-secrets-manager": "^3.654.0",
+    "aws-jwt-verify": "^4.0.1"
+  },
+  "keywords": ["aws", "lambda", "websocket", "junokit"],
+  "author": "Junokit Team",
+  "license": "MIT"
+} 

@@ -72,49 +72,57 @@ export function ChatSidebar({ onClose, onConversationSelect, onNewConversation, 
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Fetched conversations:', data);
-        
-        // Filter and format conversations from the backend data
+        // Group messages by conversationId to create conversation summaries
         const conversationMap = new Map();
         
-        // First pass: Create conversation entries from metadata
+        // Process all messages and group by conversation
         data.conversations.forEach((item: any) => {
-          if (item.SK && item.SK.startsWith('CONV#') && item.title) {
-            const convId = item.conversationId;
-            conversationMap.set(convId, {
-              id: convId,
-              title: item.title,
-              lastMessage: '',
-              timestamp: new Date(item.updatedAt || item.createdAt),
-              messageCount: 0,
-            });
-          }
-        });
-        
-        // Second pass: Count messages and find last message for each conversation
-        data.conversations.forEach((item: any) => {
-          // Only count actual messages (not metadata)
+          // Only process actual messages
           if (item.SK && item.SK.startsWith('MSG#') && item.conversationId && (item.role === 'user' || item.role === 'assistant')) {
             const convId = item.conversationId;
-            if (conversationMap.has(convId)) {
-              const conv = conversationMap.get(convId);
-              conv.messageCount += 1;
-              
-              // Update last message - use the most recent message as last message
-              if (!conv.lastMessage || new Date(item.timestamp) > new Date(conv.lastMessageTime || 0)) {
-                conv.lastMessage = item.content.substring(0, 100) + (item.content.length > 100 ? '...' : '');
-                conv.lastMessageTime = item.timestamp;
-              }
+            const messageTime = new Date(item.timestamp);
+            
+            if (!conversationMap.has(convId)) {
+              // Create new conversation entry
+              conversationMap.set(convId, {
+                id: convId,
+                title: '', // Will be set from first user message
+                lastMessage: '',
+                timestamp: messageTime,
+                messageCount: 0,
+                firstUserMessage: '',
+                lastMessageTime: messageTime,
+              });
+            }
+            
+            const conv = conversationMap.get(convId);
+            conv.messageCount += 1;
+            
+            // Update latest timestamp
+            if (messageTime > conv.timestamp) {
+              conv.timestamp = messageTime;
+            }
+            
+            // Set title from first user message if not set
+            if (!conv.title && item.role === 'user') {
+              conv.title = item.content.substring(0, 50) + (item.content.length > 50 ? '...' : '');
+            }
+            
+            // Update last message - use the most recent message
+            if (messageTime >= conv.lastMessageTime) {
+              conv.lastMessage = item.content.substring(0, 100) + (item.content.length > 100 ? '...' : '');
+              conv.lastMessageTime = messageTime;
             }
           }
         });
         
-        // Clean up temporary field and convert to array
+        // Clean up temporary fields and convert to array
         const formattedConversations = Array.from(conversationMap.values())
           .map(conv => {
-            const { lastMessageTime, ...cleanConv } = conv;
+            const { lastMessageTime, firstUserMessage, ...cleanConv } = conv;
             return cleanConv;
           })
+          .filter(conv => conv.title) // Only include conversations with titles (user messages)
           .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
         
         setConversations(formattedConversations);
@@ -251,7 +259,7 @@ export function ChatSidebar({ onClose, onConversationSelect, onNewConversation, 
       </div>
 
       {/* Conversations List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         <div className="p-2 space-y-1">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { JunokitHero } from '@/components/blocks/junokit-hero';
 import { IntegrationsNetwork } from '@/components/blocks/integrations-diagram';
+import { ProductionStatus } from '@/components/ProductionStatus';
 import { 
   MoonIcon,
   SunIcon,
@@ -79,6 +80,41 @@ export default function HomePage() {
       <main className="pt-16">
         <JunokitHero />
         <IntegrationsNetwork />
+        
+        {/* Development Tools Section */}
+        <section className="py-16 bg-gray-50 dark:bg-gray-800">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+                🚀 Phase 5: Real-time Features
+              </h2>
+              <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto mb-8">
+                WebSocket infrastructure is now deployed to production! 
+                Test the real-time communication features live on AWS.
+              </p>
+              
+              <ProductionStatus />
+            </div>
+            
+            <div className="flex justify-center space-x-4">
+              <button
+                onClick={() => router.push('/websocket-demo')}
+                className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transform transition hover:scale-105"
+              >
+                <span className="mr-2">⚡</span>
+                Test WebSocket Connection
+              </button>
+              
+              <button
+                onClick={() => router.push('/realtime-chat-test')}
+                className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transform transition hover:scale-105"
+              >
+                <span className="mr-2">💬</span>
+                Test Real-time Chat
+              </button>
+            </div>
+          </div>
+        </section>
       </main>
 
 
