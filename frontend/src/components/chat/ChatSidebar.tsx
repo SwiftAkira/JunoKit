@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   PlusIcon,
   ChatBubbleLeftIcon,
@@ -10,10 +11,6 @@ import {
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 
-interface ChatSidebarProps {
-  onClose: () => void;
-}
-
 interface Conversation {
   id: string;
   title: string;
@@ -22,35 +19,117 @@ interface Conversation {
   messageCount: number;
 }
 
-// Mock data - will be replaced with real data from API
-const mockConversations: Conversation[] = [
-  {
-    id: '1',
-    title: 'Deploy AWS Lambda',
-    lastMessage: 'Great! Your Lambda function is now deployed to eu-north-1.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-    messageCount: 12
-  },
-  {
-    id: '2', 
-    title: 'Debug React Component',
-    lastMessage: 'The issue is in the useEffect dependency array...',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-    messageCount: 8
-  },
-  {
-    id: '3',
-    title: 'Database Schema Design',
-    lastMessage: 'For your user table, I recommend adding an index on...',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-    messageCount: 15
-  }
-];
+interface ChatSidebarProps {
+  onClose: () => void;
+  onConversationSelect?: (conversationId: string) => void;
+  onNewConversation?: () => void;
+  activeConversationId?: string;
+}
 
-export function ChatSidebar({ onClose }: ChatSidebarProps) {
-  const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
-  const [activeConversation, setActiveConversation] = useState<string>('1');
+// Lightweight markdown renderer for sidebar text
+const SidebarMarkdown = ({ text, className = '' }: { text: string; className?: string }) => {
+  // Simple regex-based markdown parsing for basic formatting
+  const renderMarkdown = (content: string) => {
+    // Handle bold text **text**
+    content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Handle italic text *text*
+    content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    // Handle code `code`
+    content = content.replace(/`(.*?)`/g, '<code class="bg-gray-100 dark:bg-gray-700 px-1 rounded text-xs">$1</code>');
+    // Handle superscript <sup>text</sup> (keep as is)
+    // Handle subscript <sub>text</sub> (keep as is)
+    
+    return content;
+  };
+
+  return (
+    <span 
+      className={className}
+      dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }}
+    />
+  );
+};
+
+export function ChatSidebar({ onClose, onConversationSelect, onNewConversation, activeConversationId }: ChatSidebarProps) {
+  const { user } = useAuth();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [showMenu, setShowMenu] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch conversations from API
+  const fetchConversations = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Call API with temporary auth token for testing
+      const response = await fetch('/api/chat', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer demo-token', // Temporary auth for testing
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Fetched conversations:', data);
+        
+        // Filter and format conversations from the backend data
+        const conversationMap = new Map();
+        
+        // First pass: Create conversation entries from metadata
+        data.conversations.forEach((item: any) => {
+          if (item.SK && item.SK.startsWith('CONV#') && item.title) {
+            const convId = item.conversationId;
+            conversationMap.set(convId, {
+              id: convId,
+              title: item.title,
+              lastMessage: '',
+              timestamp: new Date(item.updatedAt || item.createdAt),
+              messageCount: 0,
+            });
+          }
+        });
+        
+        // Second pass: Count messages and find last message for each conversation
+        data.conversations.forEach((item: any) => {
+          // Only count actual messages (not metadata)
+          if (item.SK && item.SK.startsWith('MSG#') && item.conversationId && (item.role === 'user' || item.role === 'assistant')) {
+            const convId = item.conversationId;
+            if (conversationMap.has(convId)) {
+              const conv = conversationMap.get(convId);
+              conv.messageCount += 1;
+              
+              // Update last message - use the most recent message as last message
+              if (!conv.lastMessage || new Date(item.timestamp) > new Date(conv.lastMessageTime || 0)) {
+                conv.lastMessage = item.content.substring(0, 100) + (item.content.length > 100 ? '...' : '');
+                conv.lastMessageTime = item.timestamp;
+              }
+            }
+          }
+        });
+        
+        // Clean up temporary field and convert to array
+        const formattedConversations = Array.from(conversationMap.values())
+          .map(conv => {
+            const { lastMessageTime, ...cleanConv } = conv;
+            return cleanConv;
+          })
+          .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        
+        setConversations(formattedConversations);
+      }
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load conversations on component mount
+  useEffect(() => {
+    fetchConversations();
+  }, []);
 
   const formatTimestamp = (timestamp: Date) => {
     const now = new Date();
@@ -69,33 +148,71 @@ export function ChatSidebar({ onClose }: ChatSidebarProps) {
   };
 
   const handleNewChat = () => {
-    const newConversation: Conversation = {
-      id: Date.now().toString(),
-      title: 'New Conversation',
-      lastMessage: '',
-      timestamp: new Date(),
-      messageCount: 0
-    };
-    setConversations([newConversation, ...conversations]);
-    setActiveConversation(newConversation.id);
+    // Clear active conversation and let parent handle new chat
+    if (onNewConversation) {
+      onNewConversation();
+    }
   };
 
-  const handleDeleteConversation = (id: string) => {
-    setConversations(conversations.filter(conv => conv.id !== id));
-    if (activeConversation === id) {
-      setActiveConversation(conversations[0]?.id || '');
+  const handleDeleteConversation = async (id: string) => {
+    try {
+      const response = await fetch(`/api/chat/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer demo-token', // Temporary auth for testing
+        },
+      });
+
+      if (response.ok) {
+        // Remove from local state
+        setConversations(conversations.filter(conv => conv.id !== id));
+        
+        // If this was the active conversation, clear it
+        if (activeConversationId === id && onConversationSelect) {
+          onConversationSelect('');
+        }
+      } else {
+        console.error('Failed to delete conversation');
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
     }
     setShowMenu(null);
   };
 
-  const handleRenameConversation = (id: string) => {
+  const handleRenameConversation = async (id: string) => {
     const newTitle = prompt('Enter new conversation title:');
     if (newTitle) {
-      setConversations(conversations.map(conv => 
-        conv.id === id ? { ...conv, title: newTitle } : conv
-      ));
+      try {
+              const response = await fetch(`/api/chat/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer demo-token', // Temporary auth for testing
+        },
+        body: JSON.stringify({ title: newTitle }),
+      });
+
+        if (response.ok) {
+          // Update local state
+          setConversations(conversations.map(conv => 
+            conv.id === id ? { ...conv, title: newTitle } : conv
+          ));
+        } else {
+          console.error('Failed to rename conversation');
+        }
+      } catch (error) {
+        console.error('Error renaming conversation:', error);
+      }
     }
     setShowMenu(null);
+  };
+
+  const handleConversationClick = (conversationId: string) => {
+    if (onConversationSelect) {
+      onConversationSelect(conversationId);
+    }
   };
 
   return (
@@ -136,30 +253,41 @@ export function ChatSidebar({ onClose }: ChatSidebarProps) {
       {/* Conversations List */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-2 space-y-1">
-          {conversations.map((conversation) => (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+            </div>
+          ) : conversations.length === 0 ? (
+            <div className="text-center py-8 px-4">
+              <ChatBubbleLeftIcon className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">No conversations yet</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">Start a new chat to begin</p>
+            </div>
+          ) : (
+            conversations.map((conversation) => (
             <div
               key={conversation.id}
               className={`
                 relative group rounded-lg p-3 cursor-pointer transition-all duration-200
-                ${activeConversation === conversation.id 
+                ${activeConversationId === conversation.id 
                   ? 'bg-purple-50 dark:bg-purple-900/20 border-l-4 border-purple-500' 
                   : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
                 }
               `}
-              onClick={() => setActiveConversation(conversation.id)}
+              onClick={() => handleConversationClick(conversation.id)}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2 mb-1">
                     <ChatBubbleLeftIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
                     <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {conversation.title}
+                      <SidebarMarkdown text={conversation.title} />
                     </h3>
                   </div>
                   
                   {conversation.lastMessage && (
                     <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-2">
-                      {conversation.lastMessage}
+                      <SidebarMarkdown text={conversation.lastMessage} />
                     </p>
                   )}
                   
@@ -204,27 +332,9 @@ export function ChatSidebar({ onClose }: ChatSidebarProps) {
                 </div>
               </div>
             </div>
-          ))}
+          ))
+          )}
         </div>
-
-        {/* Empty state */}
-        {conversations.length === 0 && (
-          <div className="p-8 text-center">
-            <ChatBubbleLeftIcon className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-            <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-              No conversations yet
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-              Start a new conversation to begin chatting with your AI assistant.
-            </p>
-            <button
-              onClick={handleNewChat}
-              className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 text-sm font-medium"
-            >
-              Start your first chat
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

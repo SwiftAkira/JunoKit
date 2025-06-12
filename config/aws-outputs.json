@@ -1,7 +1,7 @@
 {
   "region": "eu-north-1",
   "deployment": {
-    "timestamp": "2024-12-12T00:51:29Z",
+    "timestamp": "2024-12-12T01:15:00Z",
     "stackName": "JunokitInfraStack",
     "stackArn": "arn:aws:cloudformation:eu-north-1:060795920729:stack/JunokitInfraStack/96776fe0-46ff-11f0-bc71-06c8497fa2e9"
   },
@@ -10,6 +10,7 @@
     "userPoolClientId": "66ako4srqdk2aghompd956bloa",
     "apiGatewayUrl": "https://nayr2j5df2.execute-api.eu-north-1.amazonaws.com/v1",
     "userContextTableName": "junokit-user-context-v2",
+    "chatTableName": "junokit-chat-messages",
     "apiSecretsArn": "arn:aws:secretsmanager:eu-north-1:060795920729:secret:junokit-api-secrets-CUfe8u",
     "lambdaExecutionRoleArn": "arn:aws:iam::060795920729:role/junokit-lambda-execution-role",
     "lambdaLogGroupName": "/aws/lambda/junokit"
@@ -21,16 +22,18 @@
     "NEXT_PUBLIC_API_URL": "https://nayr2j5df2.execute-api.eu-north-1.amazonaws.com/v1",
     "AWS_REGION": "eu-north-1",
     "USER_CONTEXT_TABLE": "junokit-user-context-v2",
+    "CHAT_TABLE": "junokit-chat-messages",
     "API_SECRETS_ARN": "arn:aws:secretsmanager:eu-north-1:060795920729:secret:junokit-api-secrets-CUfe8u",
     "LAMBDA_EXECUTION_ROLE_ARN": "arn:aws:iam::060795920729:role/junokit-lambda-execution-role"
   },
   "status": "DEPLOYED",
   "notes": {
-    "deployment": "Infrastructure successfully updated with Lambda functions",
+    "deployment": "Infrastructure successfully updated with AI chat functionality",
     "cognito": "User pool configured for invite-only registration",
-    "dynamodb": "User context table with user profiles (v2)",
+    "dynamodb": "User context table (v2) and chat messages table deployed",
     "apiGateway": "REST API with Lambda integration and Cognito auth",
-    "lambda": "User profile Lambda function deployed with local bundling",
+    "lambda": "User profile and AI chat Lambda functions deployed",
+    "chat": "AI chat endpoints: GET/POST /chat, GET /chat/{conversationId}",
     "secrets": "API secrets ready for OpenRouter, Slack, GitHub tokens",
     "iam": "Lambda execution role with required permissions",
     "monitoring": "CloudWatch log groups created, metrics enabled",

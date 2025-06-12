@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -16,30 +17,38 @@ import {
   ArrowRightIcon
 } from '@heroicons/react/24/outline';
 
-// Mock data for recent conversations
-const recentConversations = [
-  {
-    id: '1',
-    title: 'Deploy AWS Lambda',
-    lastMessage: 'Great! Your Lambda function is now deployed to eu-north-1.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-    messageCount: 12
-  },
-  {
-    id: '2', 
-    title: 'Debug React Component',
-    lastMessage: 'The issue is in the useEffect dependency array...',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-    messageCount: 8
-  },
-  {
-    id: '3',
-    title: 'Database Schema Design',
-    lastMessage: 'For your user table, I recommend adding an index on...',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-    messageCount: 15
-  }
-];
+// Interface for conversation data
+interface Conversation {
+  id: string;
+  title: string;
+  lastMessage: string;
+  timestamp: Date;
+  messageCount: number;
+}
+
+// Lightweight markdown renderer for sidebar text
+const SidebarMarkdown = ({ text, className = '' }: { text: string; className?: string }) => {
+  // Simple regex-based markdown parsing for basic formatting
+  const renderMarkdown = (content: string) => {
+    // Handle bold text **text**
+    content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Handle italic text *text*
+    content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    // Handle code `code`
+    content = content.replace(/`(.*?)`/g, '<code class="bg-gray-100 dark:bg-gray-700 px-1 rounded text-xs">$1</code>');
+    // Handle superscript <sup>text</sup> (keep as is)
+    // Handle subscript <sub>text</sub> (keep as is)
+    
+    return content;
+  };
+
+  return (
+    <span 
+      className={className}
+      dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }}
+    />
+  );
+};
 
 const RetroGrid = () => {
   return (
@@ -54,8 +63,11 @@ const RetroGrid = () => {
 
 export default function DashboardPage() {
   const { isDarkMode, toggleDarkMode } = useTheme();
+  const { user, userProfile, isAuthenticated } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [recentConversations, setRecentConversations] = useState<Conversation[]>([]);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(true);
 
   // Check if user is new (in real app, this would come from user data)
   useEffect(() => {
@@ -63,6 +75,79 @@ export default function DashboardPage() {
     if (!hasSeenOnboarding) {
       setShowOnboarding(true);
     }
+  }, []);
+
+  // Fetch real conversations from API
+  useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        setIsLoadingConversations(true);
+        const response = await fetch('/api/chat', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer demo-token', // Temporary auth for testing
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Process conversations similar to ChatSidebar
+          const conversationMap = new Map();
+          
+          // First pass: Create conversation entries from metadata
+          data.conversations.forEach((item: any) => {
+            if (item.SK && item.SK.startsWith('CONV#') && item.title) {
+              const convId = item.conversationId;
+              conversationMap.set(convId, {
+                id: convId,
+                title: item.title,
+                lastMessage: '',
+                timestamp: new Date(item.updatedAt || item.createdAt),
+                messageCount: 0,
+              });
+            }
+          });
+          
+          // Second pass: Count messages and find last message for each conversation
+          data.conversations.forEach((item: any) => {
+            // Only count actual messages (not metadata)
+            if (item.SK && item.SK.startsWith('MSG#') && item.conversationId && (item.role === 'user' || item.role === 'assistant')) {
+              const convId = item.conversationId;
+              if (conversationMap.has(convId)) {
+                const conv = conversationMap.get(convId);
+                conv.messageCount += 1;
+                
+                // Update last message - use the most recent message as last message
+                if (!conv.lastMessage || new Date(item.timestamp) > new Date(conv.lastMessageTime || 0)) {
+                  conv.lastMessage = item.content.substring(0, 100) + (item.content.length > 100 ? '...' : '');
+                  conv.lastMessageTime = item.timestamp;
+                }
+              }
+            }
+          });
+          
+          // Convert to array and sort by timestamp (most recent first), limit to 3 for dashboard
+          const formattedConversations = Array.from(conversationMap.values())
+            .map(conv => {
+              const { lastMessageTime, ...cleanConv } = conv;
+              return cleanConv;
+            })
+            .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+            .slice(0, 3); // Only show 3 most recent on dashboard
+          
+          setRecentConversations(formattedConversations);
+        }
+      } catch (error) {
+        console.error('Error fetching conversations:', error);
+        setRecentConversations([]);
+      } finally {
+        setIsLoadingConversations(false);
+      }
+    };
+
+    fetchConversations();
   }, []);
 
   const handleOnboardingComplete = () => {
@@ -75,8 +160,8 @@ export default function DashboardPage() {
     setShowOnboarding(false);
   };
 
-  // Mock user data
-  const mockUser = {
+  // Use real user data or fallback to demo data
+  const displayUser = userProfile || {
     firstName: 'Demo',
     lastName: 'User',
     email: 'demo@example.com',
@@ -144,11 +229,11 @@ export default function DashboardPage() {
               <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" aria-hidden="true"></div>
                 <span className="text-sm text-gray-700 dark:text-gray-300">
-                  {mockUser.firstName}
+                  {displayUser.firstName}
                 </span>
               </div>
               <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                {mockUser.firstName[0]}
+                {displayUser.firstName[0]}
               </div>
             </div>
           </div>
@@ -162,11 +247,11 @@ export default function DashboardPage() {
           <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50">
             <div className="flex items-center space-x-4">
               <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                {mockUser.firstName[0]}
+                {displayUser.firstName[0]}
               </div>
               <div className="flex-1">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                  Welcome back, {mockUser.firstName}! 👋
+                  Welcome back, {displayUser.firstName}! 👋
                 </h2>
                 <p className="text-gray-600 dark:text-gray-400">
                   Ready to continue your AI-powered productivity journey?
@@ -238,35 +323,63 @@ export default function DashboardPage() {
               View all <ArrowRightIcon className="w-4 h-4 ml-1" />
             </Link>
           </div>
-          <div className="space-y-3">
-            {recentConversations.map((conversation, index) => (
-              <Link key={conversation.id} href={`/chat?id=${conversation.id}`} className="block group">
-                <div id={index === 0 ? "conversation-item" : undefined} className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 dark:border-gray-700/50 hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-200">
+          
+          {isLoadingConversations ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 dark:border-gray-700/50 animate-pulse">
                   <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <ChatBubbleLeftIcon className="h-4 w-4 text-purple-500 flex-shrink-0" />
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                          {conversation.title}
-                        </h4>
-                      </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-2">
-                        {conversation.lastMessage}
-                      </p>
-                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-500">
-                        <span className="flex items-center">
-                          <ClockIcon className="w-3 h-3 mr-1" />
-                          {formatTimestamp(conversation.timestamp)}
-                        </span>
-                        <span>{conversation.messageCount} messages</span>
-                      </div>
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded mb-2 w-3/4"></div>
+                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-full"></div>
+                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
                     </div>
-                    <ArrowRightIcon className="w-4 w-4 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-1 transition-all ml-3 flex-shrink-0" />
                   </div>
                 </div>
+              ))}
+            </div>
+          ) : recentConversations.length === 0 ? (
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl p-8 border border-gray-200/50 dark:border-gray-700/50 text-center">
+              <ChatBubbleLeftIcon className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+              <p className="text-gray-500 dark:text-gray-400 mb-2">No conversations yet</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">Start your first chat to see it here</p>
+              <Link href="/chat" className="inline-flex items-center text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 text-sm font-medium">
+                Start chatting <ArrowRightIcon className="w-4 h-4 ml-1" />
               </Link>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentConversations.map((conversation, index) => (
+                <Link key={conversation.id} href={`/chat?id=${conversation.id}`} className="block group">
+                  <div id={index === 0 ? "conversation-item" : undefined} className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 dark:border-gray-700/50 hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-200">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <ChatBubbleLeftIcon className="h-4 w-4 text-purple-500 flex-shrink-0" />
+                          <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                            <SidebarMarkdown text={conversation.title} />
+                          </h4>
+                        </div>
+                        {conversation.lastMessage && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-2">
+                            <SidebarMarkdown text={conversation.lastMessage} />
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-500">
+                          <span className="flex items-center">
+                            <ClockIcon className="w-3 h-3 mr-1" />
+                            {formatTimestamp(conversation.timestamp)}
+                          </span>
+                          <span>{conversation.messageCount} messages</span>
+                        </div>
+                      </div>
+                      <ArrowRightIcon className="w-4 w-4 text-gray-400 group-hover:text-purple-500 group-hover:translate-x-1 transition-all ml-3 flex-shrink-0" />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </main>
 

@@ -38,6 +38,37 @@ export class JunokitInfraStack extends cdk.Stack {
       timeToLiveAttribute: 'ttl', // Auto-cleanup for ephemeral data
     });
 
+    // 💬 DynamoDB Table - Chat Messages & Conversations
+    const chatTable = new dynamodb.Table(this, 'ChatTable', {
+      tableName: 'junokit-chat-messages',
+      partitionKey: {
+        name: 'PK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'SK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      pointInTimeRecovery: true,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      timeToLiveAttribute: 'ttl',
+    });
+
+    // Add GSI for user conversations
+    chatTable.addGlobalSecondaryIndex({
+      indexName: 'UserConversationsIndex',
+      partitionKey: {
+        name: 'GSI1PK',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'GSI1SK',
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
     // 🔐 Cognito User Pool - Authentication with Invite Codes
     this.userPool = new cognito.UserPool(this, 'JunokitUserPool', {
       userPoolName: 'junokit-users',
@@ -102,16 +133,7 @@ export class JunokitInfraStack extends cdk.Stack {
         userPassword: false, // More secure
         adminUserPassword: true, // For invite system
       },
-      oAuth: {
-        flows: {
-          authorizationCodeGrant: true,
-        },
-        scopes: [
-          cognito.OAuthScope.EMAIL,
-          cognito.OAuthScope.OPENID,
-          cognito.OAuthScope.PROFILE,
-        ],
-      },
+      // Remove OAuth configuration to use direct access tokens
       refreshTokenValidity: cdk.Duration.days(30),
       accessTokenValidity: cdk.Duration.hours(1),
       idTokenValidity: cdk.Duration.hours(1),
@@ -203,6 +225,8 @@ export class JunokitInfraStack extends cdk.Stack {
               resources: [
                 this.userContextTable.tableArn,
                 `${this.userContextTable.tableArn}/index/*`,
+                chatTable.tableArn,
+                `${chatTable.tableArn}/index/*`,
               ],
             }),
             // Secrets Manager permissions
@@ -350,6 +374,110 @@ export class JunokitInfraStack extends cdk.Stack {
 
     // CORS is handled automatically by defaultCorsPreflightOptions
 
+    // AI Chat Lambda Function
+    const aiChatFunction = new lambda.Function(this, 'AiChatFunction', {
+      functionName: 'junokit-ai-chat',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('../../backend/functions/chat', {
+        bundling: {
+          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
+          command: [
+            'bash', '-c', [
+              'cp -r /asset-input/* /asset-output/',
+              'cd /asset-output',
+              'npm install --production @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb @aws-sdk/client-secrets-manager aws-jwt-verify',
+              'npm install --save-dev typescript @types/aws-lambda',
+              'npx tsc ai-chat.ts --target es2020 --module commonjs --outDir . --esModuleInterop --skipLibCheck',
+              'mv ai-chat.js index.js',
+              'rm -f ai-chat.ts *.d.ts',
+            ].join(' && '),
+          ],
+          local: {
+            tryBundle(outputDir: string) {
+              try {
+                const fs = require('fs');
+                const path = require('path');
+                const { execSync } = require('child_process');
+                
+                const sourceDir = '../../../backend/functions/chat';
+                const fullSourcePath = path.resolve(__dirname, sourceDir);
+                
+                console.log(`Copying from: ${fullSourcePath} to: ${outputDir}`);
+                
+                execSync(`cp -r ${fullSourcePath}/* ${outputDir}/`, { stdio: 'inherit' });
+                
+                // Install production dependencies
+                execSync('npm install --production @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb @aws-sdk/client-secrets-manager aws-jwt-verify', {
+                  cwd: outputDir,
+                  stdio: 'inherit'
+                });
+                
+                // Install dev dependencies for compilation
+                execSync('npm install --save-dev typescript @types/aws-lambda', {
+                  cwd: outputDir,
+                  stdio: 'inherit'
+                });
+                
+                // Compile TypeScript to JavaScript
+                execSync('npx tsc ai-chat.ts --target es2020 --module commonjs --outDir . --esModuleInterop --skipLibCheck', {
+                  cwd: outputDir,
+                  stdio: 'inherit'
+                });
+                
+                // Rename to index.js for Lambda handler
+                execSync('mv ai-chat.js index.js', {
+                  cwd: outputDir,
+                  stdio: 'inherit'
+                });
+                
+                // Clean up TypeScript files
+                execSync('rm -f ai-chat.ts *.d.ts', {
+                  cwd: outputDir,
+                  stdio: 'inherit'
+                });
+                
+                return true;
+              } catch (error) {
+                console.error('Local bundling failed:', error);
+                return false;
+              }
+            }
+          }
+        },
+      }),
+      role: this.lambdaExecutionRole,
+      environment: {
+        USER_POOL_ID: this.userPool.userPoolId,
+        USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
+        CHAT_TABLE: chatTable.tableName,
+        API_SECRETS_ARN: apiSecrets.secretArn,
+        REGION: this.region,
+      },
+      timeout: cdk.Duration.seconds(60), // Longer timeout for AI responses
+      memorySize: 512, // More memory for AI processing
+      logGroup: lambdaLogGroup,
+    });
+
+    // API Gateway Integration - Chat Endpoints
+    const chatResource = this.api.root.addResource('chat');
+    
+    // GET /chat - Get user conversations (Lambda-based auth)
+    chatResource.addMethod('GET', new apigateway.LambdaIntegration(aiChatFunction));
+
+    // POST /chat - Create new chat message (Lambda-based auth)
+    chatResource.addMethod('POST', new apigateway.LambdaIntegration(aiChatFunction));
+
+    // GET /chat/{conversationId} - Get conversation messages (Lambda-based auth)
+    const conversationResource = chatResource.addResource('{conversationId}');
+    conversationResource.addMethod('GET', new apigateway.LambdaIntegration(aiChatFunction));
+    
+    // DELETE /chat/{conversationId} - Delete conversation (Lambda-based auth)
+    conversationResource.addMethod('DELETE', new apigateway.LambdaIntegration(aiChatFunction));
+    
+    // PUT /chat/{conversationId} - Update conversation title (Lambda-based auth)
+    conversationResource.addMethod('PUT', new apigateway.LambdaIntegration(aiChatFunction));
+
     // 📈 CloudWatch Alarms - Error Monitoring
     const lambdaErrorAlarm = new logs.MetricFilter(this, 'JunokitLambdaErrors', {
       logGroup: lambdaLogGroup,
@@ -385,6 +513,12 @@ export class JunokitInfraStack extends cdk.Stack {
       value: this.userContextTable.tableName,
       description: 'DynamoDB User Context Table Name',
       exportName: 'JunokitUserContextTable',
+    });
+
+    new cdk.CfnOutput(this, 'ChatTableName', {
+      value: chatTable.tableName,
+      description: 'DynamoDB Chat Messages Table Name',
+      exportName: 'JunokitChatTable',
     });
 
     new cdk.CfnOutput(this, 'ApiSecretsArn', {

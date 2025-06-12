@@ -14,11 +14,27 @@ import {
 export default function ChatPage() {
   const { isDarkMode, toggleDarkMode } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState<string>('');
 
   // Mock user data for testing
   const mockUser = {
     firstName: 'Demo',
     username: 'demo-user'
+  };
+
+  const handleConversationSelect = (conversationId: string) => {
+    setActiveConversationId(conversationId);
+    setSidebarOpen(false); // Close sidebar on mobile when conversation is selected
+  };
+
+  const handleNewConversation = () => {
+    setActiveConversationId('');
+    setSidebarOpen(false); // Close sidebar on mobile when starting new conversation
+  };
+
+  const handleConversationCreated = (conversationId: string) => {
+    setActiveConversationId(conversationId);
+    // Optionally refresh the sidebar to show the new conversation
   };
 
   return (
@@ -36,7 +52,12 @@ export default function ChatPage() {
         fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <ChatSidebar onClose={() => setSidebarOpen(false)} />
+        <ChatSidebar 
+          onClose={() => setSidebarOpen(false)}
+          onConversationSelect={handleConversationSelect}
+          onNewConversation={handleNewConversation}
+          activeConversationId={activeConversationId}
+        />
       </div>
 
       {/* Main content */}
@@ -68,15 +89,13 @@ export default function ChatPage() {
                     Junokit AI
                   </h1>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    AI Assistant
+                    {activeConversationId ? 'Active Conversation' : 'New Conversation'}
                   </p>
                 </div>
               </div>
             </div>
 
             <div className="flex items-center space-x-3">
-
-
               {/* Dark mode toggle */}
               <button
                 onClick={toggleDarkMode}
@@ -104,7 +123,10 @@ export default function ChatPage() {
 
         {/* Chat interface */}
         <div className="flex-1 overflow-hidden">
-          <ChatInterface />
+          <ChatInterface 
+            activeConversationId={activeConversationId}
+            onConversationCreated={handleConversationCreated}
+          />
         </div>
       </div>
     </div>

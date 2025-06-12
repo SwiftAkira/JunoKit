@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { MarkdownRenderer } from './MarkdownRenderer';
 import { 
   PaperAirplaneIcon,
   PhotoIcon,
@@ -18,40 +20,8 @@ interface Message {
   type: 'text' | 'image' | 'file';
 }
 
-// Mock messages for demo
-const mockMessages: Message[] = [
-  {
-    id: '1',
-    content: `Hello! I'm your AI assistant. I'm here to help you with development, operations, and any technical challenges you're facing. What can I help you with today?`,
-    sender: 'ai',
-    timestamp: new Date(Date.now() - 1000 * 60 * 5),
-    status: 'sent',
-    type: 'text'
-  },
-  {
-    id: '2',
-    content: 'Hi! I need help deploying a Lambda function to AWS. Can you guide me through the process?',
-    sender: 'user',
-    timestamp: new Date(Date.now() - 1000 * 60 * 4),
-    status: 'sent',
-    type: 'text'
-  },
-  {
-    id: '3',
-    content: `Absolutely! I'd be happy to help you deploy a Lambda function. Let me walk you through the process step by step:
-
-1. **Prepare your code**: Make sure your function is properly structured
-2. **Create deployment package**: Zip your code and dependencies
-3. **Configure IAM roles**: Set up proper permissions
-4. **Deploy using AWS CLI or Console**: Choose your preferred method
-
-Which deployment method would you prefer to use? AWS CLI, AWS Console, or perhaps AWS CDK/CloudFormation for infrastructure as code?`,
-    sender: 'ai',
-    timestamp: new Date(Date.now() - 1000 * 60 * 3),
-    status: 'sent',
-    type: 'text'
-  }
-];
+// Start with empty messages for production
+const initialMessages: Message[] = [];
 
 const RetroGrid = () => {
   return (
@@ -64,15 +34,68 @@ const RetroGrid = () => {
   );
 };
 
-export function ChatInterface() {
-  // Mock user data for testing
-  const mockUser = { firstName: 'Demo', username: 'demo-user' };
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
+interface ChatInterfaceProps {
+  activeConversationId?: string;
+  onConversationCreated?: (conversationId: string) => void;
+}
+
+export function ChatInterface({ activeConversationId, onConversationCreated }: ChatInterfaceProps) {
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  
+  // User data from auth context
+  const mockUser = { firstName: user?.username?.split('@')[0] || 'Demo', username: user?.username || 'demo-user' };
+
+  // Load conversation messages when activeConversationId changes
+  useEffect(() => {
+    if (activeConversationId && activeConversationId !== currentConversationId) {
+      loadConversationMessages(activeConversationId);
+      setCurrentConversationId(activeConversationId);
+    } else if (!activeConversationId) {
+      // Clear messages for new conversation
+      setMessages([]);
+      setCurrentConversationId(null);
+    }
+  }, [activeConversationId]);
+
+  const loadConversationMessages = async (conversationId: string) => {
+    try {
+      const response = await fetch(`/api/chat/${conversationId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer demo-token', // Temporary auth for testing
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Loaded conversation messages:', data);
+        
+        // Convert backend messages to frontend format
+        const formattedMessages: Message[] = data.messages
+          .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+          .map((msg: any) => ({
+            id: msg.messageId,
+            content: msg.content,
+            sender: msg.role === 'user' ? 'user' : 'ai',
+            timestamp: new Date(msg.timestamp),
+            status: 'sent' as const,
+            type: 'text' as const,
+          }));
+        
+        setMessages(formattedMessages);
+      }
+    } catch (error) {
+      console.error('Error loading conversation messages:', error);
+    }
+  };
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -100,24 +123,69 @@ export function ChatInterface() {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const messageContent = inputValue.trim();
     setInputValue('');
     setIsGenerating(true);
     setIsTyping(true);
 
-    // Simulate AI response delay
-    setTimeout(() => {
+    try {
+      // Call the chat API with current conversation ID if available
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer demo-token', // Temporary auth for testing
+        },
+        body: JSON.stringify({
+          message: messageContent,
+          conversationId: currentConversationId, // Include current conversation ID
+          model: 'default'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
       setIsTyping(false);
+      
       const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: `I understand you're asking about "${userMessage.content}". I'm here to help! This is a demo response - in the real implementation, this would connect to OpenRouter for actual AI responses.`,
+        id: data.aiMessage.messageId || (Date.now() + 1).toString(),
+        content: data.aiMessage.content,
         sender: 'ai',
-        timestamp: new Date(),
+        timestamp: new Date(data.aiMessage.timestamp),
         status: 'sent',
         type: 'text'
       };
+      
       setMessages(prev => [...prev, aiMessage]);
       setIsGenerating(false);
-    }, 2000);
+
+      // If this was a new conversation, update the conversation ID and notify parent
+      if (!currentConversationId && data.conversationId) {
+        setCurrentConversationId(data.conversationId);
+        if (onConversationCreated) {
+          onConversationCreated(data.conversationId);
+        }
+      }
+    } catch (error) {
+      console.error('Chat API error:', error);
+      setIsTyping(false);
+      
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: 'Sorry, I encountered an error while processing your request. Please try again.',
+        sender: 'ai',
+        timestamp: new Date(),
+        status: 'error',
+        type: 'text'
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+      setIsGenerating(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -143,29 +211,34 @@ export function ChatInterface() {
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 relative z-10">
-        {/* Welcome Message */}
-        <div className="flex justify-center mb-8">
-          <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50 max-w-md text-center">
-            <div className="w-16 h-16 mx-auto mb-4 relative">
-              <Image
-                src="/JunoKitColorNoBGNoTEXT.png"
-                alt="Junokit AI"
-                width={64}
-                height={64}
-                className="w-full h-full object-contain"
-              />
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center">
-                <span className="text-xs">🤖</span>
+        {/* Welcome Message - Only show when no messages */}
+        {messages.length === 0 && (
+          <div className="flex justify-center mb-8">
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50 max-w-md text-center">
+              <div className="w-16 h-16 mx-auto mb-4 relative">
+                <Image
+                  src="/JunoKitColorNoBGNoTEXT.png"
+                  alt="Junokit AI"
+                  width={64}
+                  height={64}
+                  className="w-full h-full object-contain"
+                />
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center">
+                  <span className="text-xs">🤖</span>
+                </div>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Junokit AI Assistant
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Ready to help with coding, projects, and more
+              </p>
+              <div className="text-xs text-gray-500 dark:text-gray-500">
+                Start a conversation by typing a message below
               </div>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              AI Assistant
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Your intelligent AI companion for any task or question
-            </p>
           </div>
-        </div>
+        )}
 
         {/* Messages */}
         {messages.map((message) => (
@@ -199,8 +272,14 @@ export function ChatInterface() {
                   : 'bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 text-gray-900 dark:text-white mr-2'
                 }
               `}>
-                <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-                  {message.content}
+                <div className="text-sm leading-relaxed">
+                  {message.sender === 'ai' ? (
+                    <MarkdownRenderer content={message.content} />
+                  ) : (
+                    <div className="whitespace-pre-wrap break-words">
+                      {message.content}
+                    </div>
+                  )}
                 </div>
                 <div className={`text-xs mt-2 ${message.sender === 'user' ? 'text-purple-100' : 'text-gray-500 dark:text-gray-400'}`}>
                   {formatTimestamp(message.timestamp)}
