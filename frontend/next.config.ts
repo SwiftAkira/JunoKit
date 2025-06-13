@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Removed static export - using SSR for API routes
+  // Using SSR for API route support
   trailingSlash: true,
   
   env: {
