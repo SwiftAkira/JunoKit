@@ -10,23 +10,13 @@ frontend:
     build:
       commands:
         - npm run build
-        - echo "=== Current directory ==="
-        - pwd
-        - echo "=== Creating index.html ==="
-        - echo "<html><body><h1>JunoKit Deployment Test</h1><p>Build time $(date)</p><p>SUCCESS Basic deployment is working</p><a href=\"/test.html\">Test HTML</a> | <a href=\"/test.json\">Test JSON</a></body></html>" > index.html
-        - echo "=== Creating test files ==="
-        - echo "<h1>Test HTML Working</h1><p>Static file deployment confirmed</p>" > test.html
-        - echo "{\"status\":\"ok\",\"message\":\"JSON working\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > test.json
-        - echo "=== Verifying files exist ==="
-        - ls -la index.html test.html test.json
-        - echo "=== Directory contents ==="
-        - ls -la
+        - echo "=== Build completed successfully ==="
+        - echo "=== Static export output ==="
+        - ls -la out/
   artifacts:
-    baseDirectory: frontend
+    baseDirectory: frontend/out
     files:
-      - 'index.html'
-      - 'test.html'
-      - 'test.json'
+      - '**/*'
   cache:
     paths:
       - frontend/node_modules/**/*
