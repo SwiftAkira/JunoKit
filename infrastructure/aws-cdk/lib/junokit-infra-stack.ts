@@ -174,7 +174,12 @@ export class JunokitInfraStack extends cdk.Stack {
       restApiName: 'junokit-api',
       description: 'Junokit AI Work Assistant API',
       defaultCorsPreflightOptions: {
-        allowOrigins: apigateway.Cors.ALL_ORIGINS, // Configure properly for production
+        allowOrigins: [
+          'http://localhost:3000',      // Development
+          'http://localhost:3005',      // Alternative dev port
+          'https://junokit.com',        // Production
+          'https://www.junokit.com',    // WWW redirect
+        ],
         allowMethods: apigateway.Cors.ALL_METHODS,
         allowHeaders: [
           'Content-Type',

@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowPathIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
-export default function SlackCallbackPage() {
+function SlackCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
@@ -113,5 +113,36 @@ export default function SlackCallbackPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+            Slack Integration
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Loading...
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex flex-col items-center space-y-4">
+            <ArrowPathIcon className="h-12 w-12 text-blue-500 animate-spin" />
+            <h3 className="text-lg font-medium text-gray-900">Loading...</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function SlackCallbackPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <SlackCallbackContent />
+    </Suspense>
   );
 } 
