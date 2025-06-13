@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Using SSR mode for API route support (Slack OAuth, etc.)
+  // Enable standalone output for better Amplify compatibility
+  output: 'standalone',
   trailingSlash: true,
   
   env: {
