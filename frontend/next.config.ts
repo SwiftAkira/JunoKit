@@ -1,12 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Output configuration for AWS Amplify
-  output: 'export',
+  // Removed static export - using SSR for API routes
   trailingSlash: true,
-  images: {
-    unoptimized: true,
-  },
   
   env: {
     NEXT_PUBLIC_AWS_REGION: 'eu-north-1',
