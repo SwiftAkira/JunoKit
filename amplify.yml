@@ -9,7 +9,6 @@ frontend:
         - npm ci
     build:
       commands:
-        - cd frontend
         - npm run build
         - echo "=== Current directory ==="
         - pwd
