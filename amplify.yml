@@ -10,10 +10,19 @@ frontend:
     build:
       commands:
         - npm run build
+        - echo "=== Creating root index.html ==="
+        - echo '<html><body><h1>🚀 JunoKit Deployment Test</h1><p>Build time: '$(date)'</p><p>If you see this, basic deployment works!</p><a href="/test.html">Test HTML</a> | <a href="/test.json">Test JSON</a></body></html>' > index.html
+        - echo "=== Creating test files ==="
+        - echo '<h1>✅ Test HTML Working!</h1><p>Static file deployment confirmed.</p>' > test.html
+        - echo '{"status":"ok","message":"JSON API test","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > test.json
+        - echo "=== Files created ==="
+        - ls -la *.html *.json
   artifacts:
     baseDirectory: frontend
     files:
-      - '**/*'
+      - 'index.html'
+      - 'test.html'
+      - 'test.json'
   cache:
     paths:
       - frontend/node_modules/**/*
