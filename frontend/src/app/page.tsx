@@ -14,6 +14,11 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function HomePage() {
+  // Debug logging
+  console.log('🚀 HomePage rendering at:', new Date().toISOString());
+  console.log('🌍 Environment:', process.env.NODE_ENV);
+  console.log('🔧 Next.js version:', process.env.NEXT_VERSION || 'unknown');
+
   const { isAuthenticated, user, userProfile, signOut } = useAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const router = useRouter();
@@ -116,8 +121,6 @@ export default function HomePage() {
           </div>
         </section>
       </main>
-
-
 
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12">
