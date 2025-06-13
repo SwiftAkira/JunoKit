@@ -1,12 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Enable static export for Amplify
-  output: 'export',
+  // Using SSR mode for API route support (Slack OAuth, etc.)
   trailingSlash: true,
-  images: {
-    unoptimized: true,
-  },
   
   env: {
     NEXT_PUBLIC_AWS_REGION: 'eu-north-1',

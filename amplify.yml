@@ -10,11 +10,8 @@ frontend:
     build:
       commands:
         - npm run build
-        - echo "=== Build completed successfully ==="
-        - echo "=== Static export output ==="
-        - ls -la out/
   artifacts:
-    baseDirectory: frontend/out
+    baseDirectory: frontend
     files:
       - '**/*'
   cache:
