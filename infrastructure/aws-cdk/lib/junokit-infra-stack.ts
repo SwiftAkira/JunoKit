@@ -174,12 +174,7 @@ export class JunokitInfraStack extends cdk.Stack {
       restApiName: 'junokit-api',
       description: 'Junokit AI Work Assistant API',
       defaultCorsPreflightOptions: {
-        allowOrigins: [
-          'http://localhost:3000',      // Development
-          'http://localhost:3005',      // Alternative dev port
-          'https://junokit.com',        // Production
-          'https://www.junokit.com',    // WWW redirect
-        ],
+        allowOrigins: apigateway.Cors.ALL_ORIGINS, // Configure properly for production
         allowMethods: apigateway.Cors.ALL_METHODS,
         allowHeaders: [
           'Content-Type',
@@ -539,8 +534,131 @@ export class JunokitInfraStack extends cdk.Stack {
       logGroup: lambdaLogGroup,
     });
 
-    // API Gateway Integration - Slack Endpoints
+    // =============================================================================
+    // JIRA INTEGRATION FUNCTION
+    // =============================================================================
+
+    // Jira Integration Lambda Function
+    const jiraIntegrationFunction = new lambda.Function(this, 'JiraIntegrationFunction', {
+      functionName: 'junokit-jira-integration',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'jira-integration.handler',
+      code: lambda.Code.fromAsset('../../backend/functions/integrations', {
+        bundling: {
+          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
+          command: [
+            'bash', '-c', [
+              'cp -r /asset-input/* /asset-output/',
+              'cd /asset-output',
+              'npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb @aws-sdk/client-secrets-manager aws-jwt-verify @types/aws-lambda',
+            ].join(' && '),
+          ],
+          local: {
+            tryBundle(outputDir: string) {
+              try {
+                const fs = require('fs');
+                const path = require('path');
+                const { execSync } = require('child_process');
+                
+                const sourceDir = '../../../backend/functions/integrations';
+                const fullSourcePath = path.resolve(__dirname, sourceDir);
+                
+                console.log(`Copying from: ${fullSourcePath} to: ${outputDir}`);
+                
+                execSync(`cp -r ${fullSourcePath}/* ${outputDir}/`, { stdio: 'inherit' });
+                
+                execSync('npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb @aws-sdk/client-secrets-manager aws-jwt-verify @types/aws-lambda', {
+                  cwd: outputDir,
+                  stdio: 'inherit'
+                });
+                
+                return true;
+              } catch (error) {
+                console.error('Local bundling failed:', error);
+                return false;
+              }
+            }
+          }
+        },
+      }),
+      role: this.lambdaExecutionRole,
+      environment: {
+        USER_CONTEXT_TABLE: this.userContextTable.tableName,
+        USER_POOL_ID: this.userPool.userPoolId,
+        USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
+        REGION: this.region,
+      },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      logGroup: lambdaLogGroup,
+    });
+
+    // API Gateway Integration - Integration Endpoints
     const integrationsResource = this.api.root.addResource('integrations');
+    
+    // Shared Cognito Authorizer for all integration endpoints
+    const sharedCognitoAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'SharedIntegrationsAuthorizer', {
+      cognitoUserPools: [this.userPool],
+    });
+    
+    // =============================================================================
+    // JIRA API ENDPOINTS
+    // =============================================================================
+    
+    const jiraResource = integrationsResource.addResource('jira');
+    
+    // Jira connection management
+    const jiraConnectResource = jiraResource.addResource('connect');
+    jiraConnectResource.addMethod('POST', new apigateway.LambdaIntegration(jiraIntegrationFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: sharedCognitoAuthorizer,
+    });
+
+    const jiraStatusResource = jiraResource.addResource('status');
+    jiraStatusResource.addMethod('GET', new apigateway.LambdaIntegration(jiraIntegrationFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: sharedCognitoAuthorizer,
+    });
+
+    const jiraDisconnectResource = jiraResource.addResource('disconnect');
+    jiraDisconnectResource.addMethod('DELETE', new apigateway.LambdaIntegration(jiraIntegrationFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: sharedCognitoAuthorizer,
+    });
+
+    // Jira data endpoints
+    const jiraProjectsResource = jiraResource.addResource('projects');
+    jiraProjectsResource.addMethod('GET', new apigateway.LambdaIntegration(jiraIntegrationFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: sharedCognitoAuthorizer,
+    });
+
+    const jiraIssuesResource = jiraResource.addResource('issues');
+    jiraIssuesResource.addMethod('GET', new apigateway.LambdaIntegration(jiraIntegrationFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: sharedCognitoAuthorizer,
+    });
+
+    const jiraIssueResource = jiraResource.addResource('issue');
+    jiraIssueResource.addMethod('POST', new apigateway.LambdaIntegration(jiraIntegrationFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: sharedCognitoAuthorizer,
+    });
+    jiraIssueResource.addMethod('PUT', new apigateway.LambdaIntegration(jiraIntegrationFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: sharedCognitoAuthorizer,
+    });
+
+    const jiraSearchResource = jiraResource.addResource('search');
+    jiraSearchResource.addMethod('GET', new apigateway.LambdaIntegration(jiraIntegrationFunction), {
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: sharedCognitoAuthorizer,
+    });
+
+    // =============================================================================
+    // SLACK API ENDPOINTS
+    // =============================================================================
+    
     const slackResource = integrationsResource.addResource('slack');
     
     // Slack OAuth endpoints

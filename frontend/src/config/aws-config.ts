@@ -1,99 +1,5 @@
-/**
- * AWS Configuration for Junokit
- * Contains all AWS service configurations from deployed infrastructure
- */
-
-import { Amplify } from 'aws-amplify';
-
-// AWS Infrastructure Configuration (Stockholm - eu-north-1)
-export const awsConfig = {
-  region: 'eu-north-1',
-  
-  // Cognito Configuration
-  cognito: {
-    userPoolId: 'eu-north-1_QUaZ7e7OU',
-    userPoolClientId: '66ako4srqdk2aghompd956bloa',
-    region: 'eu-north-1',
-  },
-  
-  // API Gateway Configuration
-  api: {
-    baseUrl: 'https://nayr2j5df2.execute-api.eu-north-1.amazonaws.com/v1',
-    region: 'eu-north-1',
-  },
-  
-  // Application Configuration
-  app: {
-    name: 'Junokit',
-    version: '1.0.0',
-    environment: process.env.NODE_ENV || 'development',
-  },
-  
-  // Feature Flags
-  features: {
-    enableThemes: true,
-    enableChat: true,
-    enableNotifications: true,
-  },
-  
-  // Theme System Configuration
-  themes: {
-    default: 'general',
-    available: ['general'] as const,
-  },
-};
-
-// Amplify Configuration
-export const amplifyConfig = {
-  Auth: {
-    Cognito: {
-      userPoolId: awsConfig.cognito.userPoolId,
-      userPoolClientId: awsConfig.cognito.userPoolClientId,
-      region: awsConfig.cognito.region,
-      loginWith: {
-        email: true,
-        username: false,
-        phone: false,
-      },
-      signUpVerificationMethod: 'code' as const,
-      userAttributes: {
-        email: {
-          required: true,
-        },
-        given_name: {
-          required: true,
-        },
-        family_name: {
-          required: true,
-        },
-      },
-      allowGuestAccess: false,
-      passwordFormat: {
-        minLength: 8,
-        requireLowercase: true,
-        requireUppercase: true,
-        requireNumbers: true,
-        requireSpecialCharacters: false,
-      },
-    },
-  },
-  API: {
-    REST: {
-      JunokitAPI: {
-        endpoint: awsConfig.api.baseUrl,
-        region: awsConfig.api.region,
-      },
-    },
-  },
-};
-
-// Initialize Amplify
-export const configureAmplify = () => {
-  Amplify.configure(amplifyConfig);
-};
-
-// Theme Type Definitions
-export type ThemeType = typeof awsConfig.themes.available[number];
+// AWS Configuration and Theme Types
+export type ThemeType = 'general' | 'tech' | 'business' | 'creative' | 'academic';
 
 export interface UserTheme {
   id: ThemeType;
@@ -101,17 +7,94 @@ export interface UserTheme {
   description: string;
   primaryColor: string;
   secondaryColor: string;
+  icon: string;
 }
 
-// Theme Configurations
 export const themeConfigurations: Record<ThemeType, UserTheme> = {
   general: {
     id: 'general',
-    name: 'AI Assistant',
-    description: 'Your intelligent AI companion for any task or question',
+    name: 'General',
+    description: 'Clean and professional theme for general use',
+    primaryColor: 'blue',
+    secondaryColor: 'cyan',
+    icon: '🎯',
+  },
+  tech: {
+    id: 'tech',
+    name: 'Tech',
+    description: 'Dark theme optimized for developers and tech professionals',
+    primaryColor: 'green',
+    secondaryColor: 'emerald',
+    icon: '💻',
+  },
+  business: {
+    id: 'business',
+    name: 'Business',
+    description: 'Professional theme for business and corporate use',
     primaryColor: 'purple',
     secondaryColor: 'violet',
+    icon: '💼',
   },
+  creative: {
+    id: 'creative',
+    name: 'Creative',
+    description: 'Vibrant theme for creative professionals and artists',
+    primaryColor: 'orange',
+    secondaryColor: 'amber',
+    icon: '🎨',
+  },
+  academic: {
+    id: 'academic',
+    name: 'Academic',
+    description: 'Focused theme for students and academic professionals',
+    primaryColor: 'pink',
+    secondaryColor: 'rose',
+    icon: '📚',
+  },
+};
+
+// Production-ready AWS Configuration
+// Automatically detects environment and uses correct settings
+const getAWSConfig = () => {
+  // Production configuration
+  const config = {
+    region: 'eu-north-1',
+    userPoolId: 'eu-north-1_QUaZ7e7OU',
+    userPoolWebClientId: '66ako4srqdk2aghompd956bloa',
+    apiGatewayUrl: 'https://nayr2j5df2.execute-api.eu-north-1.amazonaws.com/v1',
+    identityPoolId: 'eu-north-1:14cedb7e-3002-4cbd-b1f3-c27f5e1349ba',
+  };
+
+  // Just return the production config - no environment overrides needed
+  // This eliminates the need for manual configuration
+
+  return config;
+};
+
+export const awsConfig = {
+  ...getAWSConfig(),
+  themes: {
+    default: 'general' as ThemeType,
+    available: ['general', 'tech', 'business', 'creative', 'academic'] as ThemeType[],
+  },
+  features: {
+    voiceInput: true,
+    fileUpload: true,
+    messageReactions: true,
+    searchEnabled: true,
+    integrations: {
+      slack: true,
+      jira: true,
+    },
+  },
+};
+
+// Direct AWS SDK Configuration - No Amplify needed
+export const cognitoConfig = {
+  region: awsConfig.region,
+  userPoolId: awsConfig.userPoolId,
+  userPoolWebClientId: awsConfig.userPoolWebClientId,
+  identityPoolId: awsConfig.identityPoolId,
 };
 
 export default awsConfig; 

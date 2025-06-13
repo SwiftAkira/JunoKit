@@ -51,7 +51,7 @@
 - **Styling**: Tailwind CSS with custom themes and glass-morphism effects
 - **State Management**: React Context (Auth + Theme)
 - **Markdown**: react-markdown with syntax highlighting
-- **Authentication**: AWS Amplify + Cognito
+- **Authentication**: Direct AWS SDK + Cognito
 - **Voice Input**: Web Speech API for speech-to-text
 - **File Upload**: Universal file handling system
 

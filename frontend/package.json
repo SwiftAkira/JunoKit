@@ -3,18 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
-    "@aws-amplify/ui-react": "^6.11.2",
+    "@aws-sdk/client-cognito-identity-provider": "^3.682.0",
     "@headlessui/react": "^2.2.4",
     "@heroicons/react": "^2.2.0",
     "@radix-ui/react-slot": "^1.2.3",
     "@tailwindcss/typography": "^0.5.16",
-    "aws-amplify": "^6.15.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.17.0",
@@ -35,8 +34,6 @@
     "ws": "^8.18.2"
   },
   "devDependencies": {
-    "@aws-amplify/backend": "^1.16.1",
-    "@aws-amplify/backend-cli": "^1.8.0",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

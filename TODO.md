@@ -52,7 +52,7 @@
 ### **Frontend**
 
 * **Framework:** Next.js (React, supports SSR & static)
-* **Hosting:** AWS Amplify Hosting (with SSR)
+* **Hosting:** Direct AWS deployment (no Amplify)
 * **Design:** Custom UI, mascot and themes, responsive (mobile-friendly)
 * **Auth:** AWS Cognito (SSO, invite code system)
 * **Notifications:** Emails via AWS SES
@@ -75,7 +75,7 @@
 ### **DevOps & Infra**
 
 * **IaC:** AWS CDK or Terraform
-* **CI/CD:** Amplify CI/CD (for frontend); GitHub Actions for backend
+* **CI/CD:** Direct deployment scripts; GitHub Actions for backend
 * **Monitoring:** AWS CloudWatch
 * **Security:** IAM roles, encrypted storage, GDPR configs
 

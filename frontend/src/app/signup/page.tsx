@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { signUp, SignUpInput, confirmSignUp } from 'aws-amplify/auth';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -30,7 +29,7 @@ const RetroGrid = () => {
 
 export default function SignupPage() {
   const { isDarkMode, toggleDarkMode } = useTheme();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, signUp, confirmSignUp } = useAuth();
   const router = useRouter();
   const [formData, setFormData] = useState({
     firstName: '',
@@ -86,24 +85,12 @@ export default function SignupPage() {
     setIsLoading(true);
 
     try {
-      const signUpInput: SignUpInput = {
-        username: formData.email,
-        password: formData.password,
-        options: {
-          userAttributes: {
-            email: formData.email,
-            given_name: formData.firstName,
-            family_name: formData.lastName,
-          },
-        },
-      };
-
-      const result = await signUp(signUpInput);
+      const result = await signUp(formData.email, formData.password, formData.firstName, formData.lastName);
       
-      if (result.nextStep?.signUpStep === 'CONFIRM_SIGN_UP') {
+      if (result) {
         setNeedsConfirmation(true);
-      } else if (result.isSignUpComplete) {
-        setSuccess(true);
+      } else {
+        setError('Sign up failed. Please try again.');
       }
     } catch (error: any) {
       console.error('Sign up error:', error);
@@ -135,12 +122,13 @@ export default function SignupPage() {
     setIsLoading(true);
 
     try {
-      await confirmSignUp({
-        username: formData.email,
-        confirmationCode: confirmationCode,
-      });
+      const result = await confirmSignUp(formData.email, confirmationCode);
       
-      setSuccess(true);
+      if (result) {
+        setSuccess(true);
+      } else {
+        setError('Confirmation failed. Please try again.');
+      }
     } catch (error: any) {
       console.error('Confirmation error:', error);
       

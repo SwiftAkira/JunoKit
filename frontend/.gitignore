@@ -40,7 +40,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# amplify
-.amplify
-amplify_outputs*
-amplifyconfiguration*
+# AWS configuration (keep local env files private)
+.env.local

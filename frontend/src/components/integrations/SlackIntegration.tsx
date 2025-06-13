@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchAuthSession } from 'aws-amplify/auth';
 import { SiSlack } from 'react-icons/si';
 import { 
   CheckIcon, 
@@ -52,20 +51,13 @@ export default function SlackIntegration() {
   const { user } = useAuth();
   
   // Helper function to get auth headers
-  const getAuthHeaders = async (): Promise<Record<string, string>> => {
-    try {
-      const session = await fetchAuthSession();
-      const accessToken = session.tokens?.accessToken?.toString();
-      if (accessToken) {
-        return {
-          'Authorization': `Bearer ${accessToken}`,
-        };
-      }
-      return {};
-    } catch (error) {
-      console.error('Failed to get auth session:', error);
-      return {};
+  const getAuthHeaders = (): Record<string, string> => {
+    if (user?.token) {
+      return {
+        'Authorization': `Bearer ${user.token}`,
+      };
     }
+    return {};
   };
 
   const [integration, setIntegration] = useState<SlackIntegration | null>(null);
@@ -96,7 +88,7 @@ export default function SlackIntegration() {
         return;
       }
 
-      const headers = await getAuthHeaders();
+      const headers = getAuthHeaders();
       const response = await fetch('/api/integrations/slack/status', {
         headers,
       });
@@ -125,7 +117,7 @@ export default function SlackIntegration() {
 
   const loadChannelsAndUsers = async () => {
     try {
-      const headers = await getAuthHeaders();
+      const headers = getAuthHeaders();
       const [channelsResponse, usersResponse] = await Promise.all([
         fetch('/api/integrations/slack/channels', {
           headers,
@@ -153,7 +145,7 @@ export default function SlackIntegration() {
     setConnecting(true);
     
     try {
-      const headers = await getAuthHeaders();
+      const headers = getAuthHeaders();
       const response = await fetch('/api/integrations/slack/auth', {
         headers,
       });
@@ -179,7 +171,7 @@ export default function SlackIntegration() {
     }
 
     try {
-      const headers = await getAuthHeaders();
+      const headers = getAuthHeaders();
       const response = await fetch('/api/integrations/slack/disconnect', {
         method: 'DELETE',
         headers,
@@ -210,7 +202,7 @@ export default function SlackIntegration() {
     setSending(true);
     
     try {
-      const headers = await getAuthHeaders();
+      const headers = getAuthHeaders();
       const messageRequest: SlackMessageRequest = {
         channel: messageForm.channel,
         text: messageForm.text,

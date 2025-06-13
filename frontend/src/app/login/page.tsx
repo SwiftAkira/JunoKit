@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { signIn, SignInInput } from 'aws-amplify/auth';
+// Removed Amplify auth import - using auth context directly
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -29,7 +29,7 @@ const RetroGrid = () => {
 
 export default function LoginPage() {
   const { isDarkMode, toggleDarkMode } = useTheme();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, signIn: authSignIn } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -50,56 +50,17 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const signInInput: SignInInput = {
-        username: email,
-        password: password,
-      };
-
-      const result = await signIn(signInInput);
+      const success = await authSignIn(email, password);
       
-      // Handle different sign-in outcomes
-      if (result.isSignedIn) {
+      if (success) {
         // Successfully signed in
         router.push('/dashboard');
-      } else if (result.nextStep) {
-        // Handle additional steps (MFA, password reset, etc.)
-        switch (result.nextStep.signInStep) {
-          case 'CONFIRM_SIGN_UP':
-            setError('Please check your email and confirm your account first.');
-            break;
-          case 'RESET_PASSWORD':
-            setError('Password reset required. Please check your email.');
-            break;
-          case 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED':
-            setError('Please set a new password.');
-            break;
-          default:
-            setError('Additional verification required. Please check your email.');
-        }
+      } else {
+        setError('Invalid email or password. Please try again.');
       }
     } catch (error: any) {
       console.error('Sign in error:', error);
-      
-      // Handle specific error types
-      switch (error.name) {
-        case 'NotAuthorizedException':
-          setError('Invalid email or password. Please try again.');
-          break;
-        case 'UserNotConfirmedException':
-          setError('Please check your email and confirm your account first.');
-          break;
-        case 'UserNotFoundException':
-          setError('No account found with this email address.');
-          break;
-        case 'TooManyRequestsException':
-          setError('Too many failed attempts. Please try again later.');
-          break;
-        case 'LimitExceededException':
-          setError('Too many requests. Please try again later.');
-          break;
-        default:
-          setError('Sign in failed. Please try again.');
-      }
+      setError('Sign in failed. Please try again.');
     } finally {
       setIsLoading(false);
     }

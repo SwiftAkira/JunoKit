@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchAuthSession } from 'aws-amplify/auth';
 import { createWebSocket, getWebSocket, WebSocketResponse } from '@/lib/websocket';
 
 interface Message {
@@ -60,13 +59,8 @@ export function useRealtimeChat(): UseRealtimeChatReturn {
       try {
         // Get auth token if user is authenticated
         let token = null;
-        if (user) {
-          try {
-            const session = await fetchAuthSession();
-            token = session.tokens?.accessToken?.toString();
-          } catch (error) {
-            console.warn('Could not get auth token:', error);
-          }
+        if (user?.token) {
+          token = user.token;
         }
 
         // Set token if available

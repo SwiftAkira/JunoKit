@@ -1,12 +1,26 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { getCurrentUser, signOut, AuthUser, fetchAuthSession } from 'aws-amplify/auth';
-import { Hub } from 'aws-amplify/utils';
-import { configureAmplify, ThemeType } from '@/config/aws-config';
+import { 
+  CognitoIdentityProviderClient,
+  GetUserCommand,
+  InitiateAuthCommand,
+  SignUpCommand,
+  ConfirmSignUpCommand,
+  ForgotPasswordCommand,
+  ConfirmForgotPasswordCommand
+} from '@aws-sdk/client-cognito-identity-provider';
+// Note: fromCognitoIdentityPool can be added later if needed for cross-service authentication
 
-// Configure Amplify on module load
-configureAmplify();
+// AWS Configuration
+const cognitoClient = new CognitoIdentityProviderClient({
+  region: process.env.NEXT_PUBLIC_AWS_REGION || 'eu-north-1',
+});
+
+const USER_POOL_ID = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || '';
+const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || '';
+
+export type ThemeType = 'dev' | 'ops' | 'qa' | 'sales' | 'media';
 
 interface UserProfile {
   userId: string;
@@ -21,11 +35,16 @@ interface UserProfile {
 }
 
 interface AuthContextType {
-  user: AuthUser | null;
+  user: any | null;
   userProfile: UserProfile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   signOut: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<boolean>;
+  signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<boolean>;
+  confirmSignUp: (email: string, code: string) => Promise<boolean>;
+  forgotPassword: (email: string) => Promise<boolean>;
+  confirmForgotPassword: (email: string, code: string, newPassword: string) => Promise<boolean>;
   refreshUserProfile: () => Promise<void>;
 }
 
@@ -36,20 +55,41 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
-  const isAuthenticated = !!user;
+  const isAuthenticated = !!user && !!accessToken;
+
+  // Get user from access token
+  const getUserFromToken = async (token: string) => {
+    try {
+      const command = new GetUserCommand({
+        AccessToken: token,
+      });
+      
+      const response = await cognitoClient.send(command);
+      return {
+        username: response.Username,
+        attributes: response.UserAttributes?.reduce((acc: Record<string, string>, attr: any) => {
+          if (attr.Name && attr.Value) {
+            acc[attr.Name] = attr.Value;
+          }
+          return acc;
+        }, {} as Record<string, string>)
+      };
+    } catch (error) {
+      console.error('Error getting user from token:', error);
+      return null;
+    }
+  };
 
   // Fetch user profile from our API
-  const fetchUserProfile = async (authUser: AuthUser): Promise<UserProfile | null> => {
+  const fetchUserProfile = async (authUser: any): Promise<UserProfile | null> => {
     try {
-      const { username } = authUser;
-      const session = await fetchAuthSession();
-      const accessToken = session.tokens?.accessToken?.toString();
+      if (!accessToken) return null;
       
-      // Use local mock API for testing, will switch to AWS API Gateway later
       const apiUrl = process.env.NODE_ENV === 'development' 
         ? '/api/user/profile' 
         : `${process.env.NEXT_PUBLIC_API_URL}/user/profile`;
@@ -63,13 +103,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (response.ok) {
         const profileData = await response.json();
         return {
-          userId: username,
-          email: profileData.email,
-          firstName: profileData.given_name || profileData.firstName,
-          lastName: profileData.family_name || profileData.lastName,
-          role: profileData.custom_role || 'dev',
-          theme: (profileData.custom_theme || 'dev') as ThemeType,
-          inviteCode: profileData.custom_inviteCode,
+          userId: authUser.username,
+          email: authUser.attributes?.email || profileData.email,
+          firstName: authUser.attributes?.given_name || profileData.firstName || '',
+          lastName: authUser.attributes?.family_name || profileData.lastName || '',
+          role: authUser.attributes?.['custom:userRole'] || 'dev',
+          theme: (authUser.attributes?.['custom:theme'] || 'dev') as ThemeType,
+          inviteCode: authUser.attributes?.['custom:inviteCode'],
           createdAt: profileData.createdAt || new Date().toISOString(),
           lastLoginAt: new Date().toISOString(),
         };
@@ -81,21 +121,158 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  // Sign in function
+  const signIn = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const command = new InitiateAuthCommand({
+        AuthFlow: 'USER_PASSWORD_AUTH',
+        ClientId: CLIENT_ID,
+        AuthParameters: {
+          USERNAME: email,
+          PASSWORD: password,
+        },
+      });
+
+      const response = await cognitoClient.send(command);
+      
+      if (response.AuthenticationResult?.AccessToken) {
+        const token = response.AuthenticationResult.AccessToken;
+        setAccessToken(token);
+        
+        // Store token in localStorage for persistence
+        localStorage.setItem('accessToken', token);
+        localStorage.setItem('refreshToken', response.AuthenticationResult.RefreshToken || '');
+        localStorage.setItem('idToken', response.AuthenticationResult.IdToken || '');
+        
+        const authUser = await getUserFromToken(token);
+        if (authUser) {
+          setUser(authUser);
+          const profile = await fetchUserProfile(authUser);
+          setUserProfile(profile);
+        }
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error signing in:', error);
+      return false;
+    }
+  };
+
+  // Sign up function
+  const signUp = async (email: string, password: string, firstName: string, lastName: string): Promise<boolean> => {
+    try {
+      const command = new SignUpCommand({
+        ClientId: CLIENT_ID,
+        Username: email,
+        Password: password,
+        UserAttributes: [
+          {
+            Name: 'email',
+            Value: email,
+          },
+          {
+            Name: 'given_name',
+            Value: firstName,
+          },
+          {
+            Name: 'family_name',
+            Value: lastName,
+          },
+        ],
+      });
+
+      await cognitoClient.send(command);
+      return true;
+    } catch (error) {
+      console.error('Error signing up:', error);
+      return false;
+    }
+  };
+
+  // Confirm sign up function
+  const confirmSignUp = async (email: string, code: string): Promise<boolean> => {
+    try {
+      const command = new ConfirmSignUpCommand({
+        ClientId: CLIENT_ID,
+        Username: email,
+        ConfirmationCode: code,
+      });
+
+      await cognitoClient.send(command);
+      return true;
+    } catch (error) {
+      console.error('Error confirming sign up:', error);
+      return false;
+    }
+  };
+
+  // Forgot password function
+  const forgotPassword = async (email: string): Promise<boolean> => {
+    try {
+      const command = new ForgotPasswordCommand({
+        ClientId: CLIENT_ID,
+        Username: email,
+      });
+
+      await cognitoClient.send(command);
+      return true;
+    } catch (error) {
+      console.error('Error initiating forgot password:', error);
+      return false;
+    }
+  };
+
+  // Confirm forgot password function
+  const confirmForgotPassword = async (email: string, code: string, newPassword: string): Promise<boolean> => {
+    try {
+      const command = new ConfirmForgotPasswordCommand({
+        ClientId: CLIENT_ID,
+        Username: email,
+        ConfirmationCode: code,
+        Password: newPassword,
+      });
+
+      await cognitoClient.send(command);
+      return true;
+    } catch (error) {
+      console.error('Error confirming forgot password:', error);
+      return false;
+    }
+  };
+
   // Check authentication status
   const checkAuthState = async () => {
     try {
       setIsLoading(true);
-      const currentUser = await getCurrentUser();
-      setUser(currentUser);
+      const token = localStorage.getItem('accessToken');
       
-      if (currentUser) {
-        const profile = await fetchUserProfile(currentUser);
-        setUserProfile(profile);
+      if (token) {
+        setAccessToken(token);
+        const authUser = await getUserFromToken(token);
+        
+        if (authUser) {
+          setUser(authUser);
+          const profile = await fetchUserProfile(authUser);
+          setUserProfile(profile);
+        } else {
+          // Token is invalid, clear storage
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('idToken');
+        }
       }
     } catch (error) {
-      // User is not authenticated
+      console.error('Error checking auth state:', error);
+      // Clear invalid tokens
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('idToken');
       setUser(null);
       setUserProfile(null);
+      setAccessToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -103,7 +280,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Refresh user profile
   const refreshUserProfile = async () => {
-    if (user) {
+    if (user && accessToken) {
       const profile = await fetchUserProfile(user);
       setUserProfile(profile);
     }
@@ -112,40 +289,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Sign out function
   const handleSignOut = async () => {
     try {
-      await signOut();
+      // Clear local storage
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('idToken');
+      
       setUser(null);
       setUserProfile(null);
+      setAccessToken(null);
     } catch (error) {
       console.error('Error signing out:', error);
     }
   };
 
-  // Listen for auth events
+  // Check auth state on mount
   useEffect(() => {
     checkAuthState();
-
-    const hubListener = (data: any) => {
-      const { event } = data.payload;
-      
-      switch (event) {
-        case 'signedIn':
-          checkAuthState();
-          break;
-        case 'signedOut':
-          setUser(null);
-          setUserProfile(null);
-          break;
-        case 'tokenRefresh':
-          // Optionally refresh user profile on token refresh
-          break;
-        default:
-          break;
-      }
-    };
-
-    const unsubscribe = Hub.listen('auth', hubListener);
-
-    return unsubscribe;
   }, []);
 
   const value: AuthContextType = {
@@ -154,6 +313,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isLoading,
     isAuthenticated,
     signOut: handleSignOut,
+    signIn,
+    signUp,
+    confirmSignUp,
+    forgotPassword,
+    confirmForgotPassword,
     refreshUserProfile,
   };
 
@@ -187,7 +351,6 @@ export function withAuth<P extends object>(Component: React.ComponentType<P>) {
     }
 
     if (!isAuthenticated) {
-      // Redirect to login page - you can customize this
       return (
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
